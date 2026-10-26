@@ -79,6 +79,11 @@ Classificação: **A (configuração ausente) + B (dependência da VM Z.ai)**;
   v01012 40/40 · v01015 71/71 · v01024 8/8 · Pessoas 37/37 · PDF v4 38/39 por
   `pdftoppm` ausente no Windows). Nenhuma suíte toca o componente alterado; a
   superfície nova tem teste próprio.
+- **CI (GitHub Actions, Linux) — ATIVO E VERDE**:
+  - Qualidade: `tsc` escopo `src/` 0 · lint 0 · unitários 9/9 · `next build` OK.
+  - Regressão: v01012 **40/40** · v01015 **71/71** · v01024 **8/8** ·
+    PDF v4 **39/39** (poppler presente no CI) · Pessoas **37/37** · v0103
+    **50/50** — tudo com banco de CI e app no ar para as rotas reais.
 - Capturas de tela desta rodada: indisponíveis (sem browser automation).
 
 ## 7. GitHub — branch, Draft PR e verificações
@@ -88,12 +93,11 @@ Classificação: **A (configuração ausente) + B (dependência da VM Z.ai)**;
 - **Draft PR #1**: https://github.com/brunolimaff-jpg/senior-scout-360-next/pull/1
 - Testes essenciais versionados (6 suítes curadas + helpers + unitários) e
   `tests/README.md` com dependências (Bun, poppler, banco).
-- **Pendência de CI**: `.github/workflows/ci.yml` está pronto no disco local,
-  mas o push foi recusado porque o token OAuth do `gh` não tem o escopo
-  `workflow` (`refusing to allow an OAuth App to create or update workflow`).
-  Ativação: `gh auth refresh -s workflow` → `git add .github && git commit -m
-  "CI" && git push`. Também não há chave SSH registrada na conta (o push usa
-  HTTPS + credencial do gh).
+- **CI ativo e verde** (escopo OAuth `workflow` autorizado em 26/10): workflow
+  `.github/workflows/ci.yml` publicado na branch (`dd6ea30`).
+  - Run push `40387612627`: SUCCESS em 4m14s (Qualidade + Regressão).
+  - Run pull_request `40387612875`: SUCCESS em 2m57s.
+- Também não há chave SSH registrada na conta (o push usa HTTPS + credencial do gh).
 
 ## 8. Cloudflare — parecer atualizado
 
