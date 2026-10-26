@@ -67,7 +67,7 @@ Lote `cenario-b-sintetico.csv` (Cenário B — 11 entradas, 3 concluídas, 8 pen
   a sonda `scripts/probe-vm-capacity.ts` falha com a MESMA mensagem.
 - Comportamento do produto (sem simulação): a leitura enfileira e a conta fica `aiStatus=FALHOU` com
   mensagem ao operador ("A IA não conseguiu gerar a leitura desta conta agora. Você pode tentar novamente em instantes.")
-  e botão "Tentar de novo". Telemetria téc田野 mantém a causa. **Nada foi falsificado.**
+  e botão "Tentar de novo". A telemetria técnica mantém a causa. **Nada foi falsificado.**
 - O encanamento Next → resolve-service → SDK está correto (rate limit, retries de rede, normalização de
   tokens, status upstream preservado). O que falta é credencial/config do provedor.
 - **Decisão material pendente**: (a) obter a credencial Z.ai e criar `.z-ai-config` (menor delta, sem
