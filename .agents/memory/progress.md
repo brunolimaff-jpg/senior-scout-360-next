@@ -6,3 +6,11 @@
 - P2: bundle Worker vinext 19 MiB (1,1 MiB gzip) vs limite 64 MiB; bloqueios de arquitetura listados.
 - G7-P: matriz de provedores publicada (`RELATORIO-G7P-PROVEDORES.md`), sem chamadas pagas.
 - Local encerrado ("mata local"). Sessão: Vault `2026-10-26T16-21-12-scout-360-g7-consolidacao.md`.
+
+## 2026-10-26 — Auditoria de UI (somente diagnóstico)
+- Pedido do Planejador (comentário PR #1 6426666550): auditoria crítica sem implementar.
+- Parecer: `qa/g7/AUDITORIA-UI-20261026.md` (12 achados: busca truncada 50px, 598px de
+  cabeçalhos, rótulo "prontas para análise" × `dossiesProntos`, microcontroles, alinhamento,
+  contraste cinza-400 2,94:1, rótulos múltiplos, link em button, logo, flash do histórico).
+- Causa do "PR sem capturas": `/qa/` gitignorada (`.gitignore:57`); MDs force-add.
+- Zero código alterado. Sessão: Vault `2026-10-26T17-55-00-scout-360-auditoria-ui-fechamento.md`.

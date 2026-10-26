@@ -1,17 +1,30 @@
 # HANDOFF_AI — Scout 360
 
 > Ponteiro operacional. Narrativa curada no Bruno Vault:
-> `Sessões/2026-10/2026-10-26T16-21-12-scout-360-g7-consolidacao.md`
+> `Sessões/2026-10/2026-10-26T17-55-00-scout-360-auditoria-ui-fechamento.md` (auditoria UI)
+> e `Sessões/2026-10/2026-10-26T16-21-12-scout-360-g7-consolidacao.md` (G7).
 > Projeto: `Projetos/Scout-360/hub.md`
 
-## Estado (26/10/2026)
+## Estado (26/10/2026, fim de dia)
 
 - Repo local: `C:\Users\bruno.ferreira\dev\scout360-next` (fora do OneDrive).
 - Remoto privado: `brunolimaff-jpg/senior-scout-360-next` — `main` em `ede6518`.
 - Branch de trabalho: `g7/consolidacao-local` (+ commits de sessão paralela) — **Draft PR #1**.
 - Arquivo auditado da VM: `C:\Users\bruno.ferreira\dev\scout360-vm-archive` (HEAD `43f42cd`).
-- Servidores locais: encerrados. Probe vinext: `C:\Users\bruno.ferreira\dev\scout360-vinext-probe`.
+- Servidores locais: Next dev em `http://127.0.0.1:3000` (ar) e resolve-service em :3030
+  (só para a auditoria visual; encerrar se não forem usar). Probe vinext: `C:\Users\bruno.ferreira\dev\scout360-vinext-probe`.
 - CI: `.github/workflows/ci.yml` ativo; runs verdes (push 4m14s / PR 2m57s em 26/10).
+
+## Auditoria de UI (26/10 — somente diagnóstico, zero código alterado)
+
+- Pedido do Planejador: comentário 6426666550 no PR #1.
+- Parecer com 12 achados e rodadas R1–R4: `qa/g7/AUDITORIA-UI-20261026.md`
+  (capturas em `qa/g7/auditoria/` — locais; `/qa/` é gitignorada, MD force-added).
+- Top P1: busca truncada a ~50px no Dividido (1280); ~598px de cabeçalhos antes da
+  1ª linha; rótulo "prontas para análise" (`totalConfirmed`) ≠ população da Mesa
+  (`dossiesProntos`) — divergência possível 11×3 escondida pela coincidência 3=3.
+- Pendência: devolver o parecer ao Planejador (aba ChatGPT caiu no login; reenviar
+  após reautenticação).
 
 ## Validado nesta fase
 
@@ -31,9 +44,9 @@
 
 ## Próximo passo sugerido
 
-Aguardar decisão de provedor/infra. Quando houver, implementar o menor piloto
-(adapter no `resolve-service`, HTML direto para leitura) e validar com amostra
-sintética antes de ativar.
+Design primeiro (decisão de 26/10): com OK do Bruno, executar R1 do parecer
+(busca com largura mínima, chips h-7/13px, contraste) e depois R2–R4, uma rodada
+por vez com critérios de aceite observáveis. Provedor/infra continua em espera.
 
 ## Não fazer
 
