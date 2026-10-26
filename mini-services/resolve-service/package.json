@@ -1,0 +1,9 @@
+{
+  "name": "resolve-service",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "bun --hot index.ts",
+    "dev:resiliente": "while true; do bun --hot index.ts; code=$?; echo \"[supervisor] serviço saiu (code=$code) — reiniciando em 1s\"; sleep 1; done"
+  }
+}

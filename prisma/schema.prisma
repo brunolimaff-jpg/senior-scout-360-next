@@ -1,0 +1,358 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Um lote de importação (arquivo CSV enviado OU texto colado). status: PREVIEW | CONFIRMED | PROCESSING | DONE | PARTIAL | FAILED
+model ImportBatch {
+  id               String    @id @default(cuid())
+  fileName         String
+  storedPath       String
+  fileSize         Int
+  // CSV | TEXT (dados colados, não estruturados)
+  sourceType       String    @default("CSV")
+  delimiter        String    @default(";")
+  encoding         String    @default("UTF-8")
+  hasHeader        Boolean   @default(true)
+  headerJson       String    @default("[]")
+  cnpjColumnIndex  Int?
+  cnpjColumnDetect String?
+  rowCount         Int       @default(0)
+  status           String    @default("PREVIEW")
+  // contadores de progresso (mantidos durante processamento)
+  totalValid      Int @default(0)
+  totalInvalid    Int @default(0)
+  totalDuplicate  Int @default(0)
+  totalReference  Int @default(0) // linhas que entraram por referência (domínio/e-mail/site) p/ busca reversa
+  totalResolved   Int @default(0) // referências cujo CNPJ foi descoberto pela busca reversa
+  totalEnriched   Int @default(0)
+  totalPending    Int @default(0)
+  // Inteligência de conta via IA (opt-in no confirm; rate limit + cache no backend)
+  aiEnabled       Boolean   @default(false)
+  aiTotal         Int       @default(0) // linhas elegíveis a IA (enriquecidas)
+  aiDone          Int       @default(0)
+  aiFailed        Int       @default(0)
+  // Resolução de identidade (pista → candidato → confirmação na Receita)
+  totalConfirmed  Int       @default(0) // CONFIRMED
+  totalReview     Int       @default(0) // REVIEW (candidatos ambíguos ou evidência fraca)
+  totalUnresolved Int       @default(0) // UNRESOLVED (pista insuficiente)
+  // v0.10.12: estágio de confiança da identidade
+  totalLocalizado Int       @default(0) // LOCALIZADO (registro achado, vínculo com pistas não provado)
+  totalValidado   Int       @default(0) // VALIDADO (operador validou a identidade)
+  // Resumo executivo do LOTE gerado por IA (agregado; 1 chamada rate-limitada, cacheada)
+  aiSummary       String?   // JSON: { resumo_executivo, destaques[], prioridades[] }
+  aiSummaryAt     DateTime?
+  confirmedAt      DateTime?
+  processingAt     DateTime?
+  finishedAt       DateTime?
+  // ---- Lease durável (G6, auditoria v0.6.1) ----
+  // Quem está executando o lote AGORA (sobrevive a restart e é visível para TODOS
+  // os processos — não só em memória). claim atômico via updateMany condicional;
+  // heartbeat renova leaseExpiresAt; sweep só retoma quando o lease EXPIROU.
+  leaseOwner       String?   // identidade do worker (processo) que detém a execução
+  leaseExpiresAt   DateTime? // validade do lease; null = nenhum worker detém
+  // ---- Fila de pesquisa profunda por seleção (Mesa de Contas v0.9.0) ----
+  // JSON: { rowNumbers[], estado RODANDO|PAUSADA|CONCLUIDA|PARADA, posicao, motivoPausa,
+  //        solicitadoEm, heartbeat, concluidas, puladas, falhas } — durável para retomada
+  // sem repetir chamadas; executor em memória (sem Redis/cron).
+  researchQueueJson String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  rows             ImportRow[]
+  events           AuditEvent[]
+}
+
+// Uma linha do arquivo original. rowNumber preserva a ordem original (1-based sobre linhas de dados).
+model ImportRow {
+  id                 String    @id @default(cuid())
+  batchId            String
+  batch              ImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  rowNumber          Int
+  originalCellsJson  String    @default("[]")
+  // CNPJ | DOMAIN | EMAIL | URL — como esta linha foi classificada na entrada
+  lookupKind         String    @default("CNPJ")
+  // referência original (domínio/e-mail/URL) quando lookupKind != CNPJ
+  referenceValue     String?
+  // CNPJ descoberto pela resolução de identidade (RDAP, site, busca por nome), preserva zeros à esquerda
+  resolvedCnpj       String?
+  reverseSource      String?
+  // ---- resolve_company_identity (contrato: pista → candidatos → confirmação) ----
+  cluesJson          String?   // JSON: pistas normalizadas { cnpj, emails[], domains[], phones[], names[], rawLine }
+  resolutionJson     String?   // JSON: { metodo[], candidatos[], sinais[], contradicoes[], fontes[] }
+  // CONFIRMED | REVIEW | UNRESOLVED (null = linha de CNPJ direto, não precisa resolver)
+  resolutionState    String?
+  // MUITO_FORTE | FORTE | MEDIA | BAIXA | HUMANA — pela evidência, nunca score de modelo
+  resolutionConfidence String?
+  // ---- estágio de confiança da identidade (v0.10.12, contrato "corrigir a confiança") ----
+  // LOCALIZADO: registro cadastral localizado na fonte oficial, vínculo com as pistas NÃO provado
+  // CORRESPONDENTE: o cadastro corresponde às pistas fornecidas (nome/domínio/local compatíveis)
+  // VALIDADO: o operador validou a identidade explicitamente (revisão humana)
+  identityStage       String?
+  // divergências entre pistas e cadastro: [{ tipo, severidade, descricao }]
+  identityDivergenciasJson String?
+  // CNPJ raiz (8 primeiros dígitos de cnpj_encontrado)
+  cnpjRoot           String?
+  // Matriz localizada pelo campo OFICIAL identificador_matriz_filial=1 (nunca inferida por "0001")
+  headquartersCnpj   String?
+  foundIsHeadquarters Boolean?
+  // RESOLVIDA | NAO_LOCALIZADA (encontrado é filial e matriz não foi confirmada)
+  matrizStatus       String?
+  // Identificador oficial da consulta (1 = matriz, 2 = filial)
+  branchIdentifier   Int?
+  rawCnpj            String    @default("")
+  normalizedCnpj     String    @default("")
+  // VALIDA | INVALIDA | DUPLICADA | SEM_CNPJ | REFERENCIA
+  cnpjStatus         String    @default("SEM_CNPJ")
+  invalidReason      String?
+  duplicateOf        Int?
+  // PENDENTE | EM_FILA | CONSULTANDO | ENRIQUECIDO | NAO_ENCONTRADO | RATE_LIMITED | TIMEOUT | ERRO_REDE | ERRO_SERVIDOR | IGNORADO
+  lookupStatus       String    @default("PENDENTE")
+  lookupError        String?
+  // dados de enriquecimento
+  legalName          String?
+  tradeName          String?
+  registrationStatus String?
+  statusDate         String?
+  situationReason    String?
+  branchType         String?
+  openingDate        String?
+  cnaeCode           String?
+  cnaeDescription    String?
+  municipality       String?
+  uf                 String?
+  source             String?
+  queriedAt          DateTime?
+  retryCount         Int       @default(0)
+  rawJson            String?
+  // Teia societária determinística (QSA das fontes públicas) + fatos extras da consulta
+  sociosJson         String? // JSON array: [{ nome, qual, entrada }]
+  extraJson          String? // JSON: { capitalSocial, naturezaJuridica, porte, simples, mei, email, telefone, endereco, cnaesSecundarios[] }
+  // Inteligência de conta (IA). null = lote sem IA ou linha não elegível.
+  // EM_FILA | GERANDO | OK | FALHOU | IGNORADO
+  aiStatus           String?
+  aiReading          String? // síntese executiva (2–3 frases) — compat com versões anteriores
+  aiSector           String? // setor em linguagem natural
+  aiSize             String? // porte aparente a partir dos dados
+  aiProfile          String? // nota de classificação (ex.: "empresa local, deduzido pela localização...")
+  aiHypothesesJson   String? // JSON array: hipóteses comerciais a validar
+  aiQuestionsJson    String? // JSON array: perguntas de discovery
+  aiDossierJson      String? // JSON completo do dossiê Scout 360 (teia IA, operação, tecnologia, tese, próximo movimento)
+  aiModel            String? // modelo efetivamente usado (resposta do gateway)
+  aiModelRequested   String? // modelo solicitado pela configuração (auditoria de fallback)
+  aiProcessedAt      DateTime?
+  aiError            String?
+  // ---- Pesquisa da conta (research packet — nível 2, on-demand por conta) ----
+  // Pacote de evidências montado ANTES da síntese: site oficial rastreado + buscas públicas.
+  researchJson       String?   // JSON: { siteOficial{paginas[]}, buscas[], evidencias[], notas[] }
+  researchStatus     String?   // GERANDO | OK | FALHOU (null = nunca pedido)
+  researchAt         DateTime?
+  researchError      String?
+  // ---- Rastreabilidade de comparabilidade A/B (laboratório lote B) ----
+  // Hash da mensagem de usuário e do prompt de sistema com que o dossiê OFICIAL
+  // foi sintetizado — reconciliável com LabComparison.evidenceHash/systemPromptSha.
+  // Dossiês gerados antes destes campos ficam SEM hash => comparação é "histórica"
+  // (entradas não comprovadamente equivalentes), nunca "equivalente" por supuesto.
+  dossierEvidenceSha   String?
+  dossierSystemSha     String?
+  dossierPromptVersion String?
+  dossierTemperature   Float?
+  // ---- Ficha cadastral (v0.10.0 P1): separa COLETA ORIGINAL de REAPROVEITAMENTO ----
+  // collectedAt = data da coleta ORIGINAL na fonte (nunca sobrescrita por reuso);
+  // queriedAt   = quando ESTA linha obteve os dados (consulta fresca ou reuso).
+  collectedAt        DateTime?
+  // Proveniência de fontes/campos desta linha (JSON):
+  // { primaria:{fonte,coletadoEm}, complementacoes:[{fonte,campos[],coletadoEm}],
+  //   cache:{consultaOriginal,validoAte,reaproveitadoEm}|null }
+  fontesJson         String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([batchId, rowNumber])
+  @@index([lookupStatus])
+  @@index([aiStatus])
+  @@index([resolutionState])
+}
+
+/// Ficha cadastral REUTILIZÁVEL por CNPJ (v0.10.0 P1 — desenho do operador).
+/// Uma linha por CNPJ com data de coleta ORIGINAL, fonte primária e validade (TTL).
+/// Substitui o reuso entre lotes via ImportRow (que não tinha validade e
+/// sobrescrevia queriedAt). IBGE NÃO entra no cache — é rederivado localmente
+/// (grátis e determinístico) em cada reuso.
+model CadastroCache {
+  cnpj             String   @id // 14 caracteres normalizados (maiúsculas)
+  fonte            String // fonte primária (identidade)
+  coletadoEm       DateTime // data da coleta ORIGINAL — NUNCA sobrescrita por reuso
+  atualizadoEm     DateTime // última coleta real (complementação/revalidação)
+  validoAte        DateTime // coletadoEm + TTL — cache só vale até aqui
+  dadosJson        String // CnpjLookupData completo (SEM ibge) + extra
+  provenienciaJson String   @default("{}") // { campo: { fonte, coletadoEm } }
+  matrizJson       String? // { headquartersCnpj, foundIsHeadquarters, matrizStatus, branchIdentifier }
+  complementacoes  Int      @default(0) // nº de complementações acumuladas
+  revalidacoes     Int      @default(0) // nº de revalidações por TTL expirado
+
+  @@index([validoAte])
+}
+
+// Trilha de auditoria: cada evento relevante do fluxo (upload, parse, confirm, consulta, resultado, export...)
+model AuditEvent {
+  id        String      @id @default(cuid())
+  batchId   String
+  batch     ImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  rowNumber Int?
+  event     String
+  detail    String      @default("")
+  createdAt DateTime    @default(now())
+
+  @@index([batchId, createdAt])
+}
+
+/* Telemetria do Lote A (A3): evidência reconstruível de coleta/pesquisa/síntese.
+ * Um evento por consulta/chamada/etapa — correlacionável por runId/batchId/rowId.
+ * NUNCA guarda segredos, headers de autenticação nem conteúdo bruto de página. */
+model TelemetryEvent {
+  id               String    @id @default(cuid())
+  runId            String?
+  batchId          String?
+  rowId            String?
+  rowNumber        Int?
+  empresa          String?
+  cnpj             String?
+  etapa            String?
+  tipo             String
+  fonte            String?
+  operacao         String?
+  alvo             String?
+  httpStatus       Int?
+  erro             String?
+  tentativas       Int?
+  cacheHit         Boolean?
+  resultados       Int?
+  aproveitaveis    Int?
+  motivoDescarte   String?
+  modeloSolicitado String?
+  modeloEfetivo    String?
+  tokensPrompt     Int?
+  tokensCompletion Int?
+  tokensTotal      Int?
+  tokensInformado  Boolean?
+  pacoteChars      Int?
+  duracaoMs        Int?
+  appVersao        String?
+  promptVersao     String?
+  estadoFinal      String?
+  payloadJson      String?
+  startedAt        DateTime  @default(now())
+
+  @@index([batchId, startedAt])
+  @@index([runId])
+  @@index([tipo])
+}
+
+/// Lote B — dossiê EXPERIMENTAL de provedor externo (nunca substitui o oficial).
+/// Não contém chave de API: a chave vive só em memória do servidor (vault efêmero).
+model LabComparison {
+  id              String   @id
+  rowId           String
+  batchId         String
+  rowNumber       Int?
+  empresa         String?
+  cnpj            String?
+  provider        String // host do baseUrl externo (ex.: api.fornecedor.com)
+  baseUrlPath     String? // caminho da base URL (auditoria, sem segredo)
+  modelRequested  String
+  modelEffective  String?
+  promptVersion   String
+  appVersion      String
+  systemPromptSha String? // SHA-256 do system prompt (comparabilidade, sem duplicar o texto)
+  evidenceChars   Int?
+  evidenceHash    String? // SHA-256 do pacote de evidências enviado
+  packetReuse     Boolean // true = pacote reutilizado da pesquisa salva (0 buscas novas)
+  content         String? // dossiê experimental bruto (texto retornado pelo modelo)
+  parsedOk        Boolean? // conseguiu parsear como JSON de dossiê?
+  tokensPrompt    Int?
+  tokensCompletion Int?
+  tokensTotal     Int?
+  tokensInformado Boolean?
+  durationMs      Int?
+  httpStatus      Int?
+  error           String?
+  estadoFinal     String // OK | ERRO
+  createdAt       DateTime @default(now())
+
+  @@index([rowId, createdAt])
+  @@index([batchId])
+}
+
+/* ---------------- v0.10.5 — RELAÇÕES EMPRESARIAIS + MATRIZ/FILIAIS ----------------
+ * Duas frentes aprovadas, ambas SEM IA e sem inventar entidades:
+ *  A — MinhaReceita Grafo (relações societárias, on-demand, 1 hop por comando).
+ *  B — Estabelecimentos da mesma raiz descobertos por quadros societários e
+ *      CONFIRMADOS individualmente pelo registro oficial (nunca pela ordem 0001).
+ * Regras do contrato: consulta somente para CNPJs selecionados pelo usuário;
+ * sem expansão recursiva automática; cache por CNPJ/raiz/fonte com validade;
+ * 404/timeout/429 tratados honestamente; falha NUNCA apaga fato válido;
+ * NENHUM CPF (nem mascarado) e nenhuma resposta bruta de pessoa física é
+ * persistida ou exportada — só a normalização mínima com proveniência.
+ * -------------------------------------------------------------------------------- */
+
+/// Relações societárias DIRETAS de um CNPJ (QSA público via MinhaReceita Grafo).
+/// UMA linha por estabelecimento consultado. Sobrescrita só por consulta BEM-
+/// sucedida (falha preserva o fato anterior — contrato). `relacoesJson` NÃO
+/// contém CPF e NÃO contém a resposta bruta da fonte.
+model RelacaoSocietariaCache {
+  cnpj               String   @id // estabelecimento consultado (14 caracteres normalizados)
+  fonte              String // "MinhaReceita Grafo"
+  baseDados          String? // mês da base pública quando a fonte informa (ex.: "2026-10")
+  coletadoEm         DateTime // coleta ORIGINAL — nunca sobrescrita por reuso
+  atualizadoEm       DateTime // última consulta bem-sucedida
+  validoAte          DateTime // coletadoEm + TTL — reuso só dentro da validade
+  relacoesJson       String // [{ participanteId, tipo: "PF"|"PJ", nomePublico, qualificacao? (cadastro), empresaParticipada? }]
+  totalParticipantes Int      @default(0)
+  avisosJson         String? // v0.11.0 (Gate 8/G8-1): avisos de NORMALIZAÇÃO da coleta (linha sem id/sem nome/unificada por CNPJ) — preservados na releitura de cache
+
+  @@index([validoAte])
+}
+
+/// Quadro societário de UM participante (expansão manual de UMA conexão, 1 hop).
+/// `participanteId` = hash opaco da fonte (PF) OU CNPJ (PJ participante) — nunca CPF.
+model QuadroParticipanteCache {
+  participanteId String   @id
+  tipoParticipante String // PF | PJ
+  rotulo         String? // nome público conforme quadro societário (PF) ou razão social (PJ)
+  fonte          String
+  baseDados      String?
+  coletadoEm     DateTime
+  validoAte      DateTime
+  empresasJson   String // [{ cnpj, razaoSocial }] — empresas do quadro; teto de armazenamento aplicado
+  totalEmpresas  Int      @default(0) // total REAL informado pela resposta (antes do teto)
+  truncado       Boolean  @default(false) // true = teto de armazenamento foi aplicado
+  /// v0.10.24 (auditoria): avisos da normalização na COLETA (unificação de registros
+  /// repetidos da fonte por CNPJ, teto) — a leitura de cache devolve o mesmo aviso
+  /// da 1ª consulta. Null = linha de cache anterior à coluna (fallback determinístico:
+  /// rederiva o aviso de teto de truncado/totalEmpresas; unificação não é rederivável).
+  avisosJson     String?
+
+  @@index([validoAte])
+}
+
+/// Estabelecimentos LOCALIZADOS pela raiz (FRENTE B) + estado de confirmação.
+/// UMA linha por raiz (8 caracteres). A descoberta vem de quadros societários
+/// (fonte parcial, sempre rotulada); cada estabelecimento só aparece como
+/// "confirmado" depois de consulta própria ao registro oficial (campo
+/// identificador_matriz_filial). Falha de confirmação NÃO remove fatos antigos.
+model EstabelecimentoRootCache {
+  cnpjRaiz             String   @id // 8 caracteres (básico da pessoa jurídica)
+  fonteDescoberta      String // proveniência da DESCOBERTA (ex.: "MinhaReceita Grafo — quadros de participantes")
+  coletadoEm           DateTime // primeira descoberta desta raiz
+  atualizadoEm         DateTime // última atualização (descoberta ou confirmação)
+  validoAte            DateTime // validade do cache da raiz
+  estabelecimentosJson String // [{ cnpj, razaoSocial, municipio, uf, situacao, cnae, identificadorMatrizFilial, confirmado, origem: { descobertoPor, confirmadoEm?, fonteConfirmacao? } }]
+  coberturaJson        String // { participantesConsultados[], tetoParticipantes, tetoConfirmacoes, pendentesConfirmacao, totalLocalizados, parcial: true }
+  raizAlfanumerica     Boolean  @default(false)
+
+  @@index([validoAte])
+}

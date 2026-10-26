@@ -1,0 +1,594 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* =====================================================================
+   SCOUT 360 · AURORA GLASS — fonte da verdade visual
+   Base: Senior Design System (tokens oficiais preservados).
+   Camada nova: fundo aurora esmeralda vivo + superfícies de vidro.
+   Regra do glassmorphism (NN/g): vidro só onde importa — header,
+   cards-chave, banners e modais. Texto sempre opaco, contraste AA.
+   ===================================================================== */
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-public-sans), "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-public-sans), "Public Sans", system-ui, sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* ---- Paleta oficial Senior (tokens.css — contraste ajustado v0.10.11) ---- */
+  --color-senior-verde: #00968C;            /* --verde-institucional */
+  --color-senior-verde-medio: #00AF9B;      /* --verde-medio */
+  --color-senior-verde-claro: #2AC4AA;      /* --verde-claro */
+  --color-senior-verde-escuro: #086B6B;     /* --verde-escuro (texto sobre claro, AA) */
+  --color-senior-esmeralda: #0B9E8E;        /* esmeralda de transição da aurora */
+  --color-senior-laranja: #EF8833;          /* --laranja — ação de conversão (CTA) */
+  --color-senior-laranja-hover: #AE6229;    /* --laranja-hover */
+  --color-senior-amarelo: #FFC511;          /* --amarelo — atenção/revisão */
+  /* --roxo ELIMINADO da identidade IA (anti-slop): IA = esmeralda profundo + neon */
+  --color-senior-pink: #FF0069;
+  --color-senior-neon: #12F7D1;             /* --verde-neon — só acento digital/fundo escuro */
+  --color-senior-azul: #33466C;             /* --azul-escuro — TEXTO PRINCIPAL do DS */
+  --color-senior-azul-claro: #BDC6E3;       /* --azul-claro */
+  --color-senior-azul-medio: #8EA0C5;       /* --azul-medio — desabilitado */
+  --color-senior-pagina: #F6F9FE;           /* --cinza-azulado — fundo de página */
+  --color-senior-cinza-900: #3B3D3D;
+  --color-senior-cinza-600: #5F5C57;        /* --cinza-600 — texto secundário (v0.10.11: escurecido p/ contraste AA em 13px — era #77736E) */
+  --color-senior-cinza-400: #9C9C9C;        /* --cinza-400 */
+  --color-senior-cinza-300: #D4D4D4;        /* --cinza-300 — bordas */
+  --color-senior-cinza-100: #F2F2F2;        /* --cinza-100 — superfície neutra */
+}
+
+/* Variáveis brutas do DS (usadas em sombras, gradientes e espaçamentos) */
+:root {
+  --radius: 14px; /* cantos mais generosos — linguagem de vidro */
+
+  /* Tokens DS originais (nomes do pacote) */
+  --verde-institucional: #00968C;
+  --verde-medio: #00AF9B;
+  --verde-claro: #2AC4AA;
+  --verde-escuro: #086B6B;
+  --laranja: #EF8833;
+  --laranja-hover: #AE6229;
+  --amarelo: #FFC511;
+  --verde-neon: #12F7D1;
+  --azul-escuro: #33466C;
+  --azul-claro: #BDC6E3;
+  --azul-medio: #8EA0C5;
+  --cinza-azulado: #F6F9FE;
+  --cinza-900: #3B3D3D;
+  --cinza-600: #5F5C57; /* v0.10.11: contraste AA em textos pequenos (era #77736E) */
+  --cinza-400: #9C9C9C;
+  --cinza-300: #D4D4D4;
+  --cinza-100: #F2F2F2;
+  --verde-50: #00968C80;
+
+  /* Sombras oficiais */
+  --sombra-100: 0px 1px 2px rgba(0, 0, 0, 0.3);
+  --sombra-200: 0px 2px 6px 2px rgba(0, 0, 0, 0.15);
+  --sombra-400: 0px 4px 8px 3px rgba(0, 0, 0, 0.15);
+  --card-elevado-suave: 0 20px 40px 0 rgba(0, 0, 0, 0.12);
+  --card-elevado-medio: 0 40px 80px 0 rgba(0, 0, 0, 0.18);
+
+  /* Tipografia operacional — v0.10.11: piso de legibilidade 13px
+     (text-xs do Tailwind sobe de 12→13px no app inteiro, componentes shadcn incluídos) */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.45rem;
+
+  /* Sombras de vidro esmeralda — v0.10.11: mais discretas (produto de operação,
+     não vitrine) */
+  --glass-shadow: 0 1px 2px rgba(8, 107, 107, 0.04), 0 10px 32px rgba(8, 107, 107, 0.07), 0 1px 0 rgba(255, 255, 255, 0.85) inset;
+  --glass-shadow-hover: 0 2px 8px rgba(8, 107, 107, 0.06), 0 16px 44px rgba(8, 107, 107, 0.11), 0 1px 0 rgba(255, 255, 255, 0.9) inset;
+  --glow-verde: 0 4px 14px rgba(0, 150, 140, 0.22), 0 1px 4px rgba(0, 150, 140, 0.16);
+
+  /* Espaçamentos oficiais */
+  --space-widget: 100px;
+  --space-bloco: 50px;
+  --space-titulo: 25px;
+  --space-modal: 40px;
+  --space-card: 20px;
+  --space-desc: 16px;
+  --space-icone: 8px;
+
+  /* Assinaturas */
+  --degrade-verde-senior: linear-gradient(167deg, #00AF9C 0%, #12F7D1 100%);
+  --degrade-esmeralda-texto: linear-gradient(115deg, #086B6B 0%, #00968C 45%, #0BA88F 75%, #0E7E74 100%);
+  --transicao-botao: background-color 0.2s ease;
+  --transicao-card: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  --container-max: 1140px;
+
+  /* Vidro */
+  --glass-blur: 18px;
+  --glass-blur-bar: 22px;
+
+  /* Tema shadcn mapeado 1:1 nos tokens Senior */
+  --background: #F6F9FE;
+  --foreground: #33466C;
+  --card: #FFFFFF;
+  --card-foreground: #33466C;
+  --popover: #FFFFFF;
+  --popover-foreground: #33466C;
+  --primary: #00968C;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F2F2F2;
+  --secondary-foreground: #33466C;
+  --muted: #F2F2F2;
+  --muted-foreground: #77736E;
+  --accent: #00968C14; /* verde institucional a 8% — hover de item */
+  --accent-foreground: #086B6B;
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: #D4D4D4;
+  --input: #D4D4D4;
+  --ring: #00968C;
+  --chart-1: #00968C;
+  --chart-2: #EF8833;
+  --chart-3: #FFC511;
+  --chart-4: #2AC4AA;
+  --chart-5: #9C9C9C;
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #33466C;
+  --sidebar-primary: #00968C;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #F2F2F2;
+  --sidebar-accent-foreground: #33466C;
+  --sidebar-border: #D4D4D4;
+  --sidebar-ring: #00968C;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "tnum" off;
+  }
+  /* Foco visível esmeralda */
+  :focus-visible {
+    outline: 2px solid #00968C;
+    outline-offset: 2px;
+  }
+  /* Seleção esmeralda */
+  ::selection {
+    background: rgba(0, 150, 140, 0.22);
+    color: #086B6B;
+  }
+}
+
+/* ============================ AURORA ============================
+   Fundo vivo: blobs radiais esmeralda/mint em deriva lenta (anti-slop: zero roxo)
+   (transform-only, GPU). Ponto de entrada do glassmorphism — o vidro
+   só aparece se tiver algo colorido atrás. */
+
+.aurora-field {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(1400px 900px at 85% -10%, rgba(18, 247, 209, 0.12), transparent 62%),
+    radial-gradient(1000px 700px at -10% 110%, rgba(0, 150, 140, 0.08), transparent 60%),
+    linear-gradient(180deg, #F6FAF9 0%, #EDF5F2 38%, #F1F7F5 100%);
+}
+.aurora-blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(64px);
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+}
+/* v0.10.11: fundo vivo mas DISCRETO — produto de operação diária. Intensidade
+   reduzida ~45% e só dois blobs em movimento lento (eram quatro). */
+.aurora-blob-1 {
+  width: 680px;
+  height: 680px;
+  top: -240px;
+  left: -160px;
+  background: radial-gradient(circle at 30% 30%, rgba(0, 175, 155, 0.2), rgba(0, 175, 155, 0) 70%);
+  animation: aurora-drift-1 60s ease-in-out infinite alternate;
+}
+.aurora-blob-2 {
+  width: 780px;
+  height: 780px;
+  top: -180px;
+  right: -240px;
+  background: radial-gradient(circle at 60% 40%, rgba(18, 247, 209, 0.14), rgba(18, 247, 209, 0) 68%);
+  animation: aurora-drift-2 74s ease-in-out infinite alternate;
+}
+.aurora-blob-3 {
+  width: 620px;
+  height: 620px;
+  bottom: -280px;
+  left: 30%;
+  background: radial-gradient(circle at 50% 50%, rgba(0, 150, 140, 0.1), rgba(0, 150, 140, 0) 70%);
+}
+.aurora-blob-4 {
+  display: none; /* v0.10.11: quarto blob desligado — menos ruído visual */
+}
+/* grão sutil — evita banding nos degradês */
+.aurora-grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.5;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.035'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+@keyframes aurora-drift-1 {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(90px, 60px, 0) scale(1.12); }
+  100% { transform: translate3d(30px, 130px, 0) scale(0.96); }
+}
+@keyframes aurora-drift-2 {
+  0% { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+  100% { transform: translate3d(-110px, 90px, 0) scale(1.15) rotate(8deg); }
+}
+
+/* Respeita quem pediu menos movimento */
+@media (prefers-reduced-motion: reduce) {
+  .aurora-blob { animation: none !important; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Mobile: blur menor — backdrop-filter é caro em telas pequenas */
+@media (max-width: 640px) {
+  :root { --glass-blur: 12px; --glass-blur-bar: 14px; }
+}
+
+/* ============================ VIDRO ============================ */
+
+/* Painéis flutuantes Radix (select, dropdown, popover) — vidro consistente */
+[data-radix-popper-content-wrapper] > * {
+  -webkit-backdrop-filter: blur(var(--glass-blur-bar)) saturate(170%) !important;
+  backdrop-filter: blur(var(--glass-blur-bar)) saturate(170%) !important;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 255, 255, 0.86) 100%) !important;
+  border-color: rgba(255, 255, 255, 0.85) !important;
+  box-shadow: var(--glass-shadow), 0 0 0 1px rgba(0, 150, 140, 0.07) !important;
+  border-radius: 14px !important;
+}
+
+/* Superfície de vidro base — v0.10.11: mais OPACA (legibilidade acima de efeito) */
+.glass {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.88) 0%, rgba(255, 255, 255, 0.8) 100%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow:
+    var(--glass-shadow),
+    0 0 0 1px rgba(0, 150, 140, 0.05);
+}
+
+/* Vidro reforçado — header sticky, diálogos, dropdowns */
+.glass-strong {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 255, 255, 0.88) 100%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-bar)) saturate(150%);
+  backdrop-filter: blur(var(--glass-blur-bar)) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow:
+    var(--glass-shadow),
+    0 0 0 1px rgba(0, 150, 140, 0.06);
+}
+
+/* Vidro esmeralda — banners de resultado, faixas de destaque */
+.glass-verde {
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.82) 0%, rgba(230, 247, 243, 0.72) 55%, rgba(222, 245, 238, 0.7) 100%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  box-shadow:
+    var(--glass-shadow),
+    0 0 0 1px rgba(0, 150, 140, 0.1);
+}
+
+/* Chip de vidro — filtros, tags, pistas */
+.glass-chip {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.55));
+  -webkit-backdrop-filter: blur(10px) saturate(150%);
+  backdrop-filter: blur(10px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 1px 4px rgba(8, 107, 107, 0.07), 0 0 0 1px rgba(0, 150, 140, 0.05);
+}
+
+/* Elevação de hover para superfícies de vidro */
+.glass-hover {
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.glass-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--glass-shadow-hover), 0 0 0 1px rgba(0, 150, 140, 0.09);
+}
+
+/* Linha superior de brilho no vidro (reflexo) */
+.glass-reflex::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.95) 20%, rgba(255, 255, 255, 0.95) 80%, transparent);
+  pointer-events: none;
+}
+
+/* Luz cromática — v0.10.11: varredura DESLIGADA (distraindo na operação diária).
+   A classe permanece para compatibilidade, sem animação e invisível. */
+.press-feedback {
+  transition: transform 150ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: inset 0 -6px 10px rgba(255, 255, 255, 0.14);
+}
+.press-feedback:hover {
+  box-shadow: inset 0 -5px 10px rgba(255, 255, 255, 0.24);
+}
+.press-feedback:active {
+  transform: translateY(1px);
+  box-shadow: inset 0 -8px 12px rgba(8, 107, 107, 0.10);
+}
+
+/* 2. Glare hover: sheen diagonal de luz única atravessando o card */
+.text-degrade-esmeralda {
+  background: var(--degrade-esmeralda-texto);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Borda cônica girando — dropzone em drag */
+.border-girando {
+  position: relative;
+}
+.border-girando::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(from var(--ang, 0deg), #00968C, #12F7D1, #2AC4AA, #00968C);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: girar-borda 1.4s linear infinite;
+  pointer-events: none;
+}
+@property --ang {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+@keyframes girar-borda {
+  to { --ang: 360deg; }
+}
+
+/* Brilho que percorre a barra de progresso */
+.shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.65) 50%, transparent);
+  animation: shimmer-2s 1.6s infinite;
+}
+@keyframes shimmer-2s {
+  to { transform: translateX(100%); }
+}
+
+/* Flutuação suave — ícone da dropzone */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+/* Pulso suave para badges "processando" */
+.ds-display {
+  font-family: var(--font-public-sans), "Public Sans", sans-serif;
+  font-size: 36px;
+  line-height: 42px;
+  font-weight: 700;
+  letter-spacing: 0px;
+}
+.ds-widget-title {
+  font-family: var(--font-public-sans), "Public Sans", sans-serif;
+  font-size: 28px;
+  line-height: 1.2;
+  font-weight: 800;
+}
+.ds-headline {
+  font-family: var(--font-public-sans), "Public Sans", sans-serif;
+  font-size: 24px;
+  line-height: 28px;
+  font-weight: 700;
+}
+.ds-title {
+  font-family: var(--font-public-sans), "Public Sans", sans-serif;
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 700;
+}
+.ds-title-md {
+  font-family: var(--font-public-sans), "Public Sans", sans-serif;
+  font-size: 16px;
+  line-height: 25px;
+  font-weight: 700;
+  letter-spacing: 0.15px;
+}
+.ds-lead {
+  font-family: var(--font-public-sans), "Public Sans", sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+  letter-spacing: 0.5px;
+}
+.ds-body {
+  font-family: var(--font-public-sans), "Public Sans", sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+}
+.ds-caption {
+  font-family: var(--font-public-sans), "Public Sans", sans-serif;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+}
+
+/* ============================ Ações DS ============================ */
+/* CTA de conversão: laranja = ação, não decoração */
+.sn-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-icone);
+  height: 44px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #F59A48 0%, var(--laranja) 55%, #E87E22 100%);
+  color: #FFFFFF;
+  font-family: var(--font-public-sans), "Public Sans", sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s ease, filter 0.2s ease;
+  box-shadow: 0 6px 18px rgba(239, 136, 51, 0.32), 0 1px 0 rgba(255, 255, 255, 0.35) inset;
+  max-width: 100%;
+}
+.sn-cta:hover:not(:disabled) {
+  background: linear-gradient(135deg, #EE8F35 0%, var(--laranja-hover) 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 26px rgba(239, 136, 51, 0.4), 0 1px 0 rgba(255, 255, 255, 0.35) inset;
+}
+.sn-cta:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+.sn-cta:disabled {
+  background: var(--cinza-300);
+  color: var(--cinza-400);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.sn-cta svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+/* Ação secundária verde: onde a conversão não é o objetivo */
+.sn-btn-verde {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-icone);
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #00AF9B 0%, var(--verde-institucional) 60%, #00857B 100%);
+  color: #FFFFFF;
+  font-family: var(--font-public-sans), "Public Sans", sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s ease, filter 0.2s ease;
+  box-shadow: var(--glow-verde), 0 1px 0 rgba(255, 255, 255, 0.3) inset;
+}
+.sn-btn-verde:hover:not(:disabled) {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+  box-shadow: 0 12px 30px rgba(0, 150, 140, 0.42), 0 1px 0 rgba(255, 255, 255, 0.3) inset;
+}
+.sn-btn-verde:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+.sn-btn-verde:disabled {
+  background: var(--cinza-300);
+  color: var(--cinza-400);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Faixa de assinatura: degradê verde oficial do DS (v0.10.11: estática — sem
+   brilho percorrendo; a faixa marca identidade, não atrai atenção) */
+.senior-cover-strip {
+  display: block;
+  height: 4px;
+  width: 100%;
+  background: var(--degrade-verde-senior);
+  position: relative;
+}
+
+/* Superfície de card padrão — v0.10.11: vidro mais opaco (mesma classe legada) */
+.sn-surface {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.88) 0%, rgba(255, 255, 255, 0.8) 100%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  border-radius: var(--radius);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: var(--glass-shadow), 0 0 0 1px rgba(0, 150, 140, 0.05);
+  transition: var(--transicao-card);
+}
+.sn-shadow-suave {
+  box-shadow: var(--glass-shadow);
+}
+
+/* Scrollbar customizada — polegar esmeralda translúcido */
+.cnpj-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.cnpj-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.cnpj-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 150, 140, 0.28);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.cnpj-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 150, 140, 0.45);
+}
+.cnpj-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 150, 140, 0.28) transparent;
+}

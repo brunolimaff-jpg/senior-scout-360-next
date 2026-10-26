@@ -1,0 +1,61 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# testing
+coverage/
+
+# next.js
+.next/
+out/
+build/
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env*.local
+.env
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+
+# banco de dados local (dados do operador — NUNCA versionar)
+db/*.db
+db/*.db-journal
+db/*.db-wal
+db/*.db-shm
+db/backup/
+db/backups/
+
+# pacotes e artefatos de entrega
+*.zip
+download/
+upload/
+
+# logs
+dev.log
+server.log
+*.log
+
+# padrões ancorados na raiz (lição da v0.10.23: padrão nu `test` ignorava pastas em qualquer profundidade)
+/test
+/prompt
+
+# pastas de QA e evidências locais geradas em runtime (ancorada na raiz — lição v0.10.23:
+# padrão nu `qa/` também ignorava código em src/app/api/qa/; a regra vale só para a raiz)
+/qa/
+evidencias-*/
+
+# ZIP de entrega servido para download (nao versionar)
+public/Senior-Scout-360-*.zip

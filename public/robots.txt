@@ -1,0 +1,11 @@
+# Scout 360 — ferramenta INTERNA de inteligência comercial.
+# Nenhuma página, prévia ou arquivo deste ambiente deve aparecer em buscadores.
+#
+# Este arquivo nega o RASTREAMENTO. A DESINDEXAÇÃO não depende só dele
+# (Disallow sozinho não remove URLs já conhecidas): toda resposta HTTP carrega
+# o cabeçalho "X-Robots-Tag: noindex, nofollow, noarchive" (next.config.ts) e
+# o HTML renderizado carrega <meta name="robots" content="noindex, nofollow">
+# (src/app/layout.tsx). Não há sitemap nem canonical apontando para fora.
+
+User-agent: *
+Disallow: /
