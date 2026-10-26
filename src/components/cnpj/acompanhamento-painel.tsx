@@ -29,7 +29,10 @@ export function AcompanhamentoStrip({ detail }: { detail: BatchDetail }) {
   const naFila = fila && fila.estado !== "CONCLUIDA" ? fila.pendentes.length : 0;
   const interrompida = fila?.estado === "PAUSADA";
   const emExecucao = pp.emExecucao + pp.sintetizando;
-  const prontas = detail.totalEnriched - detail.totalReview; // cadastro concluído sem bloqueio
+  // G7 (P0 — contadores): identificadas = identidade confirmada (mesma população do
+  // filtro CONFIRMED da lista). Antes: totalEnriched - totalReview, que contava a
+  // consulta executada (inclusive "não encontrada") como identificação.
+  const prontas = detail.totalConfirmed; // identidade confirmada, ainda sem pesquisa profunda
 
   return (
     <div
@@ -55,7 +58,7 @@ export function AcompanhamentoStrip({ detail }: { detail: BatchDetail }) {
           label="Identificadas"
           value={prontas}
           tone="verde"
-          hint={`${plural(prontas, "conta com cadastro público coletado", "contas com cadastro público coletado")} — identificação cadastral, ainda sem pesquisa profunda`}
+          hint={`${plural(prontas, "conta com identidade confirmada", "contas com identidade confirmada")} — cadastro público localizado, ainda sem pesquisa profunda`}
         />
         <ArrowRight className="h-3 w-3 shrink-0 text-senior-cinza-400" aria-hidden="true" />
 
@@ -202,8 +205,10 @@ export function MesaEmptyState({
         <h3 className="ds-title-md text-senior-azul">Nenhum dossiê pronto neste lote</h3>
         <p className="ds-body mt-2 text-senior-cinza-600">
           A Mesa reúne as empresas cuja <b className="font-semibold text-senior-azul">pesquisa profunda foi concluída</b> e a
-          identidade não tem bloqueio. Este lote tem {plural(pp.identificadasElegiveis, "conta identificada", "contas identificadas")} —
-          {" "}{plural(pp.identificadasElegiveis, "cadastro coletado", "cadastros coletados")} que ainda pode receber pesquisa profunda.
+          identidade não tem bloqueio.
+          {pp.identificadasElegiveis > 0
+            ? ` Este lote tem ${plural(pp.identificadasElegiveis, "conta identificada", "contas identificadas")}; ${plural(pp.identificadasElegiveis, "ela ainda pode receber", "elas ainda podem receber")} pesquisa profunda.`
+            : " Este lote ainda não tem conta identificada — as pendências de entrada e revisão ficam em Lotes."}
         </p>
         <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
           <Button className="sn-btn-verde h-8 px-4 text-[13px] font-semibold" onClick={onAcompanharLotes} data-testid="mesa-vazia-cta-lotes">

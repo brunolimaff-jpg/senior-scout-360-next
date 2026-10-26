@@ -23,13 +23,17 @@
  */
 import { execSync } from "child_process";
 import { rmSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 
-const DB_ISOLADO = "/tmp/lab-test-v01024.db";
-const DB_JOURNAL = "/tmp/lab-test-v01024.db-journal";
+// G7 (ambiente): tmpdir() em vez de /tmp fixo e process.execPath em vez de `bunx`
+// no PATH — o mesmo script roda no CI Linux e no Windows.
+const DB_ISOLADO = join(tmpdir(), "lab-test-v01024.db");
+const DB_JOURNAL = `${DB_ISOLADO}-journal`;
 
 // 0) banco isolado: schema novo em arquivo limpo (fora do banco do operador)
 for (const f of [DB_ISOLADO, DB_JOURNAL]) rmSync(f, { force: true });
-execSync("bunx prisma db push --skip-generate", { env: { ...process.env, DATABASE_URL: `file:${DB_ISOLADO}` }, cwd: process.cwd(), stdio: "pipe" });
+execSync(`"${process.execPath}" x prisma db push --skip-generate`, { env: { ...process.env, DATABASE_URL: `file:${DB_ISOLADO}` }, cwd: process.cwd(), stdio: "pipe" });
 
 // env ANTES dos imports dinâmicos: o cliente Prisma resolve a URL no momento da criação
 process.env.DATABASE_URL = `file:${DB_ISOLADO}`;

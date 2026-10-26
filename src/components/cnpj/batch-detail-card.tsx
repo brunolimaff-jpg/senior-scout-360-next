@@ -1470,9 +1470,11 @@ function ResultsReadyPanel({
     alerts.push({ resumo: `${detail.alertMatriz} ${detail.alertMatriz === 1 ? "conta" : "contas"} sem matriz confirmada`, texto: `${plural(detail.alertMatriz, "conta")} com matriz não confirmada nas fontes públicas` });
   if (detail.alertHumana > 0)
     alerts.push({ resumo: `${detail.alertHumana} ${detail.alertHumana === 1 ? "identidade" : "identidades"} decidida${detail.alertHumana === 1 ? "" : "s"} manualmente`, texto: `${plural(detail.alertHumana, "identidade")} decidida manualmente por você` });
-  // v0.10.14 (reconciliação): "prontas" exclui as que aguardam revisão —
-  // antes o título dizia 24 prontas e 6 aguardando ao mesmo tempo
-  const prontas = Math.max(0, detail.totalEnriched - review);
+  // G7 (P0 — contadores): "prontas para análise" = identidades confirmadas (com
+  // cadastro localizado). totalEnriched conta a consulta executada, inclusive as 8
+  // linhas "não encontradas" do lote sintético — o título dizia 11 prontas quando
+  // só 3 tinham conteúdo analisável.
+  const prontas = Math.max(0, detail.totalConfirmed);
   // v0.11.0 (Gate 6): painel COMPACTO de uma linha — o resumo do lote não pode
   // comer a primeira dobra da mesa de investigação. O CTA de revisão (antes um
   // banner amarelo separado, ~110px) mora aqui; a explicação longa segue no
@@ -5076,7 +5078,12 @@ export function BatchDetailCard({
   // v0.11.3 (missão Lotes+Mesa): CADA botão aplica o CONJUNTO COMPLETO de filtros
   // que define a sua contagem — o número do botão e a tabela filtrada contam
   // sempre o mesmo conjunto (nenhum botão herda um filtro de outro).
-  const nIdentificadas = detail.totalConfirmed + detail.totalDirectCnpj;
+  // G7 (P0 — contadores): o botão conta a MESMA população do filtro que aplica
+  // (resolucao=CONFIRMED). `totalConfirmed + totalDirectCnpj` somava conjuntos
+  // sobrepostos (um CNPJ direto confirmado entrava duas vezes) e exibia 14 em um
+  // lote de 11 linhas. totalDirectCnpj continua disponível para os hints de
+  // cobertura; a contagem de identificadas é a de linhas com identidade confirmada.
+  const nIdentificadas = detail.totalConfirmed;
   const FILTROS_RAPIDOS: { valor: string; label: string; n: number; ativo: boolean; aplicar: () => void }[] = [
     {
       valor: "todas",
@@ -5187,8 +5194,10 @@ export function BatchDetailCard({
   const aguardandoInicio = detail.status === "CONFIRMED" && !detail.processingNow;
   const processable = detail.totalValid + detail.totalReference;
   const coverage = processable > 0 ? Math.min(100, Math.round((detail.totalEnriched / processable) * 100)) : 0;
-  // identificadas = confirmadas pela resolução + entradas que já vieram com CNPJ válido e concluíram
-  const identificadas = detail.totalConfirmed + detail.totalDirectCnpj;
+  // G7 (P0): identificadas = linhas com identidade confirmada (filtro CONFIRMED).
+  // A soma com totalDirectCnpj duplicava linhas que vieram com CNPJ válido E foram
+  // confirmadas pela resolução (14 em um lote de 11).
+  const identificadas = detail.totalConfirmed;
   // v0.10.15 (reconciliação): as 8 leituras do lote ficam explícitas nos hints —
   // entradas × processadas × aguardando × localizadas × compatíveis × revisão × validadas × falhas
   const processadas = Math.max(0, processable - detail.totalPending);

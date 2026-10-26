@@ -14,14 +14,17 @@
  */
 import { execSync } from "child_process";
 import { mkdirSync, rmSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
 import { join } from "path";
 import { jsonRes } from "./lib/json-res";
 
 /* ================= 0) banco isolado ================= */
-const DB_ISOLADO = "/tmp/consol-gate4-pessoas.db";
-const DB_JOURNAL = "/tmp/consol-gate4-pessoas.db-journal";
+// G7 (ambiente): tmpdir() em vez de /tmp fixo e process.execPath em vez de `bunx`
+// no PATH — o mesmo script roda no CI Linux e no Windows (bun em ~/.bun/bin).
+const DB_ISOLADO = join(tmpdir(), "consol-gate4-pessoas.db");
+const DB_JOURNAL = `${DB_ISOLADO}-journal`;
 for (const f of [DB_ISOLADO, DB_JOURNAL]) rmSync(f, { force: true });
-execSync("bunx prisma db push --skip-generate", { env: { ...process.env, DATABASE_URL: `file:${DB_ISOLADO}` }, cwd: process.cwd(), stdio: "pipe" });
+execSync(`"${process.execPath}" x prisma db push --skip-generate`, { env: { ...process.env, DATABASE_URL: `file:${DB_ISOLADO}` }, cwd: process.cwd(), stdio: "pipe" });
 process.env.DATABASE_URL = `file:${DB_ISOLADO}`;
 delete process.env.SCOUT_EXPORT_TOKEN;
 delete process.env.SCOUT_AUTH_REQUIRED; // modo OPEN: handlers chamados direto
