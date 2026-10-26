@@ -30,6 +30,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import type { ImperativePanelHandle } from "react-resizable-panels";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { CHAVE_PAINEL_MESA, useLarguraConteiner, useLarguraMinima, useScoutUi, type ModoVisual, type OrdenacaoTabela } from "@/hooks/use-scout-ui";
+import { dossiePronto, deveAutoAbrirFicha } from "@/lib/dossie-mesa";
 import {
   AI_STATE, BatchStateBadge, eventLabel, formatBRL, formatBR,
   FoundTypeChip, IDENTITY_STAGE, IdentityStageChip, KIND, LOOKUP_STATE, OpMetric, registrationLabel,
@@ -63,13 +64,7 @@ const RETRYABLE = new Set(["RATE_LIMITED", "TIMEOUT", "ERRO_REDE", "ERRO_SERVIDO
  * para rótulos/ação por linha; a POPULAÇÃO e o contador vêm sempre do servidor
  * (pesquisaProfunda.dossiesProntos) — UI nunca decide sozinha quem é dossiê pronto. */
 export function isDossiePronto(r: RowDetail): boolean {
-  return (
-    r.lookupStatus === "ENRIQUECIDO" &&
-    r.researchStatus === "OK" &&
-    r.aiStatus === "OK" &&
-    r.resolutionState !== "REVIEW" &&
-    r.identityStage !== "LOCALIZADO"
-  );
+  return dossiePronto(r);
 }
 
 /** Logos do portfólio Senior (Design System anexado) — ícone sempre acompanhado do nome. */
@@ -3724,7 +3719,21 @@ function FichaEmpresa({
           {/* v0.10.16: exportação em local PRÓPRIO — fora dos selos de identidade,
               comando explícito único (sem controles repetidos no corpo) */}
           <div className="flex items-center justify-between gap-2 border-t border-senior-cinza-200 pt-2" data-testid="ficha-acoes">
-            <FichaPdfButton batchId={batchId} rowNumber={r.rowNumber} />
+            {/* G7 (P0): ação de dossiê SÓ para registro com conteúdo coletado.
+                Conta não identificada recebe o motivo e a próxima ação (Lotes),
+                nunca um botão de exportação de dossiê vazio. */}
+            {r.lookupStatus === "ENRIQUECIDO" ? (
+              <FichaPdfButton batchId={batchId} rowNumber={r.rowNumber} />
+            ) : (
+              <span
+                className="ds-caption inline-flex items-center gap-1 text-senior-cinza-600"
+                title="Sem dados coletados — identidade não concluída. Ajuste a entrada em Lotes."
+                data-testid={`ficha-pdf-indisponivel-${r.rowNumber}`}
+              >
+                <FileText className="h-3 w-3" aria-hidden="true" />
+                PDF do dossiê indisponível — identidade não concluída (ajuste em Lotes)
+              </span>
+            )}
             {/* v0.10.18 — navegação entre empresas (split/foco): anterior, próxima,
                 ampliar/reduzir, voltar à lista e fechar — a ordem segue a pesquisa e
                 os filtros atuais da lista */}
@@ -5202,10 +5211,20 @@ export function BatchDetailCard({
   // abertura é LEITURA do já coletado — nenhuma consulta externa dispara — e a
   // escolha manual (selecaoManual) nunca é sobrescrita; fechar depois do auto-abrir
   // NÃO reabre (autoAbertoLote = id do lote).
+  // G7 (P0 — Lotes × Mesa): a auto-abertura exige resultado único JÁ PRONTO
+  // (dossiêPronto). Conta não identificada/com falha NÃO abre ficha vazia — ela
+  // permanece em Lotes com motivo e próxima ação; a Mesa mostra o estado vazio.
   if (
-    canExport && !active &&
-    rows.length === 1 && (pagination?.total == null || pagination.total === 1) &&
-    !selecaoManual && dossierRowNumber == null && autoAbertoLote !== detail.id
+    deveAutoAbrirFicha({
+      canExport,
+      active,
+      rows,
+      totalNaLista: pagination?.total,
+      selecaoManual,
+      dossierRowNumber,
+      autoAbertoLote,
+      loteId: detail.id,
+    })
   ) {
     setAutoAbertoLote(detail.id);
     setDossierRowNumber(rows[0].rowNumber);
