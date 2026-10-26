@@ -123,8 +123,22 @@ não usar 3 MB/10 MB e não comparar `.next/standalone` (123 MB) com o pacote fi
 
 ## 9. Decisões materiais pendentes
 
-1. **IA**: obter credencial Z.ai e criar `.z-ai-config` (menor delta) × escolher outro provedor (material).
-   Sem credencial, a cadeia pesquisa/síntese permanece desligada com erro honesto — o resto do produto opera.
+1. **IA — matriz de provedores (G7-P, `RELATORIO-G7P-PROVEDORES.md`)**:
+   contrato real verificado no código (web-search exige `url/name/snippet/host_name`;
+   page-reader exige **HTML**; scout-chat usa `thinking` específico Z.ai).
+   Recomendação do piloto: **0)** confirmar acesso ao LiteLLM da Senior (melhor arquitetura,
+   acesso NÃO comprovado no ambiente); **1)** Z.ai oficial com chave de tools (menor mudança,
+   custo NÃO VERIFICADO); **2)** DeepSeek Search+Fetch com adapter e HTML direto
+   (≈ US$ 0,01–0,02/empresa em tools + tokens; exige key paga e autorização).
+   Nenhuma chamada paga foi feita; sem `.z-ai-config`, a cadeia permanece desligada com erro honesto.
 2. **Cloudflare**: Containers (pago, preserva Stack) × reestruturação D1/R2/Queues/Container do resolve-service.
 3. **Scripts/testes**: manter a seleção curada versionada (6 suítes) — os demais 71 harnesses seguem fora do Git.
 4. **Aceite visual** da Mesa/Lotes/Expandido (capturas em `qa/g7/`) — decisão do Bruno.
+
+## 10. Estado do CI no fechamento
+
+- Push `159887f` → run `40391774553`: **Qualidade PASS** (54s–1m5s) e **Regressão PASS** (1m52s);
+  GitGuardian PASS. Run do PR (`40391784741`) com Qualidade PASS e Regressão em execução no momento
+  deste registro — reexecutar `gh pr checks 1` para o veredito final.
+- Nenhum merge, deploy ou migração executados.
+
