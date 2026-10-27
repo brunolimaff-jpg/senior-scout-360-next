@@ -132,18 +132,18 @@ function emInt(v: unknown): number {
 async function fingerprintPlano(batchId: string): Promise<string> {
   const [r] = await db.$queryRaw<FpRow[]>`
     SELECT
-      (SELECT COUNT(*) FROM ImportRow WHERE batchId = ${batchId}) AS row_count,
-      (SELECT MAX(updatedAt) FROM ImportRow WHERE batchId = ${batchId}) AS row_max,
-      (SELECT COUNT(*) FROM TelemetryEvent) AS tel_count,
-      (SELECT MAX(startedAt) FROM TelemetryEvent) AS tel_max,
-      (SELECT COUNT(*) FROM RelacaoSocietariaCache) AS rel_count,
-      (SELECT MAX(atualizadoEm) FROM RelacaoSocietariaCache) AS rel_max,
-      (SELECT COUNT(*) FROM QuadroParticipanteCache) AS quad_count,
-      (SELECT MAX(coletadoEm) FROM QuadroParticipanteCache) AS quad_max,
-      (SELECT COUNT(*) FROM EstabelecimentoRootCache) AS est_count,
-      (SELECT MAX(atualizadoEm) FROM EstabelecimentoRootCache) AS est_max,
-      (SELECT COUNT(*) FROM CadastroCache) AS cad_count,
-      (SELECT MAX(atualizadoEm) FROM CadastroCache) AS cad_max`;
+      (SELECT COUNT(*) FROM "ImportRow" WHERE "batchId" = ${batchId}) AS row_count,
+      (SELECT MAX("updatedAt") FROM "ImportRow" WHERE "batchId" = ${batchId}) AS row_max,
+      (SELECT COUNT(*) FROM "TelemetryEvent") AS tel_count,
+      (SELECT MAX("startedAt") FROM "TelemetryEvent") AS tel_max,
+      (SELECT COUNT(*) FROM "RelacaoSocietariaCache") AS rel_count,
+      (SELECT MAX("atualizadoEm") FROM "RelacaoSocietariaCache") AS rel_max,
+      (SELECT COUNT(*) FROM "QuadroParticipanteCache") AS quad_count,
+      (SELECT MAX("coletadoEm") FROM "QuadroParticipanteCache") AS quad_max,
+      (SELECT COUNT(*) FROM "EstabelecimentoRootCache") AS est_count,
+      (SELECT MAX("atualizadoEm") FROM "EstabelecimentoRootCache") AS est_max,
+      (SELECT COUNT(*) FROM "CadastroCache") AS cad_count,
+      (SELECT MAX("atualizadoEm") FROM "CadastroCache") AS cad_max`;
   return [
     revisaoFatos(),
     emInt(r.row_count), emMs(r.row_max),
