@@ -50,7 +50,7 @@ function Stat({ icon, label, value, hint, testId, tone }: { icon: React.ReactNod
         <span className="ds-caption">{label}</span>
       </div>
       <p className={`ds-title-md mt-0.5 ${tone === "alerta" ? "text-[#8a6d00]" : "text-senior-azul"}`}>{value}</p>
-      {hint && <p className="ds-caption mt-0.5 text-senior-cinza-400">{hint}</p>}
+      {hint && <p className="ds-caption mt-0.5 text-senior-cinza-500">{hint}</p>}
     </div>
   );
 }
@@ -108,7 +108,7 @@ export function TelemetryPanel({ batchId }: { batchId: string }) {
             <span className="ds-title-md text-senior-azul">Consumo do lote</span>
             <span className="ds-caption hidden text-senior-cinza-600 sm:inline">buscas, IA, cache e limites (detalhe técnico)</span>
           </span>
-          <ChevronDown className="h-4 w-4 shrink-0 text-senior-cinza-400" aria-hidden="true" />
+          <ChevronDown className="h-4 w-4 shrink-0 text-senior-cinza-500" aria-hidden="true" />
         </button>
       </div>
     );
@@ -130,7 +130,7 @@ export function TelemetryPanel({ batchId }: { batchId: string }) {
     return (
       <div className="sn-surface sn-shadow-suave p-5" data-testid="telemetria">
         <div className="flex items-center gap-2">
-          <Timer className="h-4 w-4 animate-pulse text-senior-cinza-400" aria-hidden="true" />
+          <Timer className="h-4 w-4 animate-pulse text-senior-cinza-500" aria-hidden="true" />
           <p className="ds-body text-senior-cinza-600">Carregando telemetria…</p>
         </div>
       </div>
@@ -242,7 +242,7 @@ export function TelemetryPanel({ batchId }: { batchId: string }) {
           Análises por IA: {plural(summary.ia.modelos.reduce((acc, m) => acc + m.chamadas, 0), "chamada executada", "chamadas executadas")}. Os modelos usados ficam na exportação técnica de auditoria.
         </p>
       )}
-      <p className="ds-caption mt-1.5 text-senior-cinza-400">
+      <p className="ds-caption mt-1.5 text-senior-cinza-500">
         Valores medidos nos eventos do lote. A plataforma não expõe limite de cota; nenhum número aqui é estimado.
       </p>
     </div>

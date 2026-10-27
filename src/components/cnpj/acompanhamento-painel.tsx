@@ -29,7 +29,10 @@ export function AcompanhamentoStrip({ detail }: { detail: BatchDetail }) {
   const naFila = fila && fila.estado !== "CONCLUIDA" ? fila.pendentes.length : 0;
   const interrompida = fila?.estado === "PAUSADA";
   const emExecucao = pp.emExecucao + pp.sintetizando;
-  const prontas = detail.totalEnriched - detail.totalReview; // cadastro concluído sem bloqueio
+  // G7 (P0 — contadores): identificadas = identidade confirmada (mesma população do
+  // filtro CONFIRMED da lista). Antes: totalEnriched - totalReview, que contava a
+  // consulta executada (inclusive "não encontrada") como identificação.
+  const prontas = detail.totalConfirmed; // identidade confirmada, ainda sem pesquisa profunda
 
   return (
     <div
@@ -47,7 +50,7 @@ export function AcompanhamentoStrip({ detail }: { detail: BatchDetail }) {
           value={detail.rowCount}
           hint={`${plural(detail.rowCount, "linha recebida", "linhas recebidas")} na planilha/pistas deste lote`}
         />
-        <ArrowRight className="h-3 w-3 shrink-0 text-senior-cinza-400" aria-hidden="true" />
+        <ArrowRight className="h-3 w-3 shrink-0 text-senior-cinza-500" aria-hidden="true" />
 
         {/* etapa 2 — cadastros identificados (dimensão cadastral, não dossiê) */}
         <StageChip
@@ -55,9 +58,9 @@ export function AcompanhamentoStrip({ detail }: { detail: BatchDetail }) {
           label="Identificadas"
           value={prontas}
           tone="verde"
-          hint={`${plural(prontas, "conta com cadastro público coletado", "contas com cadastro público coletado")} — identificação cadastral, ainda sem pesquisa profunda`}
+          hint={`${plural(prontas, "conta com identidade confirmada", "contas com identidade confirmada")} — cadastro público localizado, ainda sem pesquisa profunda`}
         />
-        <ArrowRight className="h-3 w-3 shrink-0 text-senior-cinza-400" aria-hidden="true" />
+        <ArrowRight className="h-3 w-3 shrink-0 text-senior-cinza-500" aria-hidden="true" />
 
         {/* etapa 3 — identidades aguardando decisão humana */}
         <StageChip
@@ -67,7 +70,7 @@ export function AcompanhamentoStrip({ detail }: { detail: BatchDetail }) {
           tone={detail.totalReview > 0 ? "atencao" : "neutro"}
           hint={`${plural(detail.totalReview, "identidade aguardando", "identidades aguardando")} sua decisão — a conta segue em Lotes até a revisão`}
         />
-        <ArrowRight className="h-3 w-3 shrink-0 text-senior-cinza-400" aria-hidden="true" />
+        <ArrowRight className="h-3 w-3 shrink-0 text-senior-cinza-500" aria-hidden="true" />
 
         {/* etapa 4 — pesquisa profunda: sub-estágios honestos, sem percentual único */}
         <span
@@ -81,7 +84,7 @@ export function AcompanhamentoStrip({ detail }: { detail: BatchDetail }) {
           <span className="ds-caption text-senior-cinza-600">pronto{pp.dossiesProntos === 1 ? "" : "s"}</span>
           {emExecucao > 0 && (
             <>
-              <span className="ds-caption text-senior-cinza-400">·</span>
+              <span className="ds-caption text-senior-cinza-500">·</span>
               <Loader2 className="h-3 w-3 animate-spin text-[#086B6B]" aria-hidden="true" />
               <span className="ds-caption font-semibold tabular-nums text-[#086B6B]" data-testid="acc-pesquisa-executando">{emExecucao}</span>
               <span className="ds-caption text-senior-cinza-600">executando</span>
@@ -89,7 +92,7 @@ export function AcompanhamentoStrip({ detail }: { detail: BatchDetail }) {
           )}
           {naFila > 0 && (
             <>
-              <span className="ds-caption text-senior-cinza-400">·</span>
+              <span className="ds-caption text-senior-cinza-500">·</span>
               <Clock className="h-3 w-3 shrink-0 text-senior-cinza-600" aria-hidden="true" />
               <span className="ds-caption font-semibold tabular-nums text-senior-cinza-600" data-testid="acc-pesquisa-fila">{naFila}</span>
               <span className="ds-caption text-senior-cinza-600">na fila</span>
@@ -97,7 +100,7 @@ export function AcompanhamentoStrip({ detail }: { detail: BatchDetail }) {
           )}
           {pp.falhas > 0 && (
             <>
-              <span className="ds-caption text-senior-cinza-400">·</span>
+              <span className="ds-caption text-senior-cinza-500">·</span>
               <CircleAlert className="h-3 w-3 shrink-0 text-[#8a6d00]" aria-hidden="true" />
               <span className="ds-caption font-semibold tabular-nums text-[#8a6d00]" data-testid="acc-pesquisa-falhas">{pp.falhas}</span>
               <span className="ds-caption text-senior-cinza-600">falha{pp.falhas === 1 ? "" : "s"}</span>
@@ -105,13 +108,13 @@ export function AcompanhamentoStrip({ detail }: { detail: BatchDetail }) {
           )}
           {interrompida && (
             <>
-              <span className="ds-caption text-senior-cinza-400">·</span>
+              <span className="ds-caption text-senior-cinza-500">·</span>
               <PauseCircle className="h-3 w-3 shrink-0 text-[#8C2F39]" aria-hidden="true" />
               <span className="ds-caption font-medium text-[#8C2F39]" data-testid="acc-pesquisa-pausada">fila pausada</span>
             </>
           )}
         </span>
-        <ArrowRight className="h-3 w-3 shrink-0 text-senior-cinza-400" aria-hidden="true" />
+        <ArrowRight className="h-3 w-3 shrink-0 text-senior-cinza-500" aria-hidden="true" />
 
         {/* etapa 5 — dossiês prontos: resultado da investigação solicitada.
             CONTRATO: 11 identificadas com 3 prontas NÃO são 11 dossiês —
@@ -202,8 +205,10 @@ export function MesaEmptyState({
         <h3 className="ds-title-md text-senior-azul">Nenhum dossiê pronto neste lote</h3>
         <p className="ds-body mt-2 text-senior-cinza-600">
           A Mesa reúne as empresas cuja <b className="font-semibold text-senior-azul">pesquisa profunda foi concluída</b> e a
-          identidade não tem bloqueio. Este lote tem {plural(pp.identificadasElegiveis, "conta identificada", "contas identificadas")} —
-          {" "}{plural(pp.identificadasElegiveis, "cadastro coletado", "cadastros coletados")} que ainda pode receber pesquisa profunda.
+          identidade não tem bloqueio.
+          {pp.identificadasElegiveis > 0
+            ? ` Este lote tem ${plural(pp.identificadasElegiveis, "conta identificada", "contas identificadas")}; ${plural(pp.identificadasElegiveis, "ela ainda pode receber", "elas ainda podem receber")} pesquisa profunda.`
+            : " Este lote ainda não tem conta identificada — as pendências de entrada e revisão ficam em Lotes."}
         </p>
         <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
           <Button className="sn-btn-verde h-8 px-4 text-[13px] font-semibold" onClick={onAcompanharLotes} data-testid="mesa-vazia-cta-lotes">
@@ -247,7 +252,7 @@ function StageChip({
   testId: string;
 }) {
   const valueTone =
-    tone === "verde" ? "text-[#00968C]" : tone === "atencao" ? "text-[#8a6d00]" : value === 0 ? "text-senior-cinza-400" : "text-senior-azul";
+    tone === "verde" ? "text-[#00968C]" : tone === "atencao" ? "text-[#8a6d00]" : value === 0 ? "text-senior-cinza-500" : "text-senior-azul";
   const border = tone === "atencao" ? "border-[#FFC51166] bg-[#FFC51114]" : tone === "verde" ? "border-[#00968C40] bg-[#00968C0A]" : "border-senior-cinza-300 bg-white";
   return (
     <span

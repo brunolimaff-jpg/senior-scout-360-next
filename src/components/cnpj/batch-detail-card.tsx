@@ -30,6 +30,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import type { ImperativePanelHandle } from "react-resizable-panels";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { CHAVE_PAINEL_MESA, useLarguraConteiner, useLarguraMinima, useScoutUi, type ModoVisual, type OrdenacaoTabela } from "@/hooks/use-scout-ui";
+import { dossiePronto, deveAutoAbrirFicha } from "@/lib/dossie-mesa";
 import {
   AI_STATE, BatchStateBadge, eventLabel, formatBRL, formatBR,
   FoundTypeChip, IDENTITY_STAGE, IdentityStageChip, KIND, LOOKUP_STATE, OpMetric, registrationLabel,
@@ -63,13 +64,7 @@ const RETRYABLE = new Set(["RATE_LIMITED", "TIMEOUT", "ERRO_REDE", "ERRO_SERVIDO
  * para rótulos/ação por linha; a POPULAÇÃO e o contador vêm sempre do servidor
  * (pesquisaProfunda.dossiesProntos) — UI nunca decide sozinha quem é dossiê pronto. */
 export function isDossiePronto(r: RowDetail): boolean {
-  return (
-    r.lookupStatus === "ENRIQUECIDO" &&
-    r.researchStatus === "OK" &&
-    r.aiStatus === "OK" &&
-    r.resolutionState !== "REVIEW" &&
-    r.identityStage !== "LOCALIZADO"
-  );
+  return dossiePronto(r);
 }
 
 /** Logos do portfólio Senior (Design System anexado) — ícone sempre acompanhado do nome. */
@@ -160,7 +155,7 @@ function RowTrustChip({ r }: { r: RowDetail }) {
       </span>
     );
   }
-  return <span className="ds-body text-senior-cinza-400">—</span>;
+  return <span className="ds-body text-senior-cinza-500">—</span>;
 }
 
 /* ==================================================================== */
@@ -196,7 +191,7 @@ function CompanyAvatar({ name, size = "h-9 w-9 text-[13px]" }: { name: string | 
   return (
     <span
       aria-hidden="true"
-      className={`flex shrink-0 select-none items-center justify-center rounded-full font-bold tracking-wide ${size} ${name ? avatarTone(name) : "bg-[#F2F2F2] text-senior-cinza-400"}`}
+      className={`flex shrink-0 select-none items-center justify-center rounded-full font-bold tracking-wide ${size} ${name ? avatarTone(name) : "bg-[#F2F2F2] text-senior-cinza-500"}`}
     >
       {companyInitials(name)}
     </span>
@@ -223,7 +218,7 @@ function IdentityFlow({ r }: { r: RowDetail }) {
         </li>
         {r.legalName && (
           <li className="flex items-start gap-3">
-            <ArrowRight className="mt-3 h-4 w-4 shrink-0 text-senior-cinza-400" aria-hidden="true" />
+            <ArrowRight className="mt-3 h-4 w-4 shrink-0 text-senior-cinza-500" aria-hidden="true" />
             <div className="min-w-0">
               <p className="ds-caption text-senior-cinza-600">EMPRESA IDENTIFICADA</p>
               <p className="ds-title-md text-senior-azul">{r.legalName}</p>
@@ -233,7 +228,7 @@ function IdentityFlow({ r }: { r: RowDetail }) {
         )}
         {r.resolvedCnpj && (
           <li className="flex items-start gap-3">
-            <ArrowRight className="mt-3 h-4 w-4 shrink-0 text-senior-cinza-400" aria-hidden="true" />
+            <ArrowRight className="mt-3 h-4 w-4 shrink-0 text-senior-cinza-500" aria-hidden="true" />
             <div className="min-w-0">
               <p className="ds-caption text-senior-cinza-600">CNPJ ENCONTRADO</p>
               <p className="ds-title-md tabular-nums text-senior-azul">{formatCnpj(r.resolvedCnpj)}</p>
@@ -248,7 +243,7 @@ function IdentityFlow({ r }: { r: RowDetail }) {
         )}
         {r.headquartersCnpj && !r.foundIsHeadquarters && (
           <li className="flex items-start gap-3">
-            <ArrowRight className="mt-3 h-4 w-4 shrink-0 text-senior-cinza-400" aria-hidden="true" />
+            <ArrowRight className="mt-3 h-4 w-4 shrink-0 text-senior-cinza-500" aria-hidden="true" />
             <div className="min-w-0">
               <p className="ds-caption text-senior-cinza-600">MATRIZ DA EMPRESA</p>
               <p className="ds-title-md tabular-nums text-senior-azul">{formatCnpj(r.headquartersCnpj)}</p>
@@ -328,7 +323,7 @@ function DiscardedList({ descartados, testId }: { descartados: DiscardedCandidat
         ))}
       </ul>
       {descartados.length > 4 && (
-        <p className="ds-caption mt-1 text-senior-cinza-400">+{descartados.length - 4} outros descartes no rastro técnico.</p>
+        <p className="ds-caption mt-1 text-senior-cinza-500">+{descartados.length - 4} outros descartes no rastro técnico.</p>
       )}
     </div>
   );
@@ -511,7 +506,7 @@ function ReviewPanel({
               </li>
             ))}
           </ul>
-          <p className="ds-caption mt-1 text-senior-cinza-400">
+          <p className="ds-caption mt-1 text-senior-cinza-500">
             Nome semelhante não comprova vínculo — cada candidato abaixo mostra a evidência que o trouxe.
           </p>
         </div>
@@ -601,7 +596,7 @@ function ReviewPanel({
                 {deciding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />} Investigar com esta pista
               </Button>
             </div>
-            <p className="ds-caption mt-1 text-senior-cinza-400">Reprocessa a busca nesta mesma linha — o histórico de auditoria é preservado.</p>
+            <p className="ds-caption mt-1 text-senior-cinza-500">Reprocessa a busca nesta mesma linha — o histórico de auditoria é preservado.</p>
           </div>
 
           {/* 2. CNPJ correto — a consulta oficial confirma */}
@@ -721,7 +716,7 @@ function CandidateRow({
     <li className={`rounded-[8px] border bg-white p-3 transition-shadow ${chosen ? "border-[#00968C66] shadow-[0_0_0_1px_#00968C33]" : "border-senior-cinza-300 hover:border-[#00968C40]"}`} data-testid={`candidate-${c.cnpj}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="ds-title-md min-w-0 text-senior-azul">
-          <span className="mr-1.5 text-senior-cinza-400">{index}.</span>
+          <span className="mr-1.5 text-senior-cinza-500">{index}.</span>
           {c.confirmado?.razaoSocial ?? formatCnpj(c.cnpj)}
         </p>
         <span className="flex items-center gap-2">
@@ -1026,7 +1021,7 @@ function SociosPanel({ r }: { r: RowDetail }) {
           <li key={i} className="ds-body flex flex-wrap items-baseline gap-x-2 text-senior-azul">
             <span className="font-medium">{s.nome}</span>
             {s.qual && <span className="text-senior-cinza-600">· {s.qual}</span>}
-            {s.entrada && <span className="text-senior-cinza-400">· desde {s.entrada}</span>}
+            {s.entrada && <span className="text-senior-cinza-500">· desde {s.entrada}</span>}
           </li>
         ))}
       </ul>
@@ -1475,9 +1470,11 @@ function ResultsReadyPanel({
     alerts.push({ resumo: `${detail.alertMatriz} ${detail.alertMatriz === 1 ? "conta" : "contas"} sem matriz confirmada`, texto: `${plural(detail.alertMatriz, "conta")} com matriz não confirmada nas fontes públicas` });
   if (detail.alertHumana > 0)
     alerts.push({ resumo: `${detail.alertHumana} ${detail.alertHumana === 1 ? "identidade" : "identidades"} decidida${detail.alertHumana === 1 ? "" : "s"} manualmente`, texto: `${plural(detail.alertHumana, "identidade")} decidida manualmente por você` });
-  // v0.10.14 (reconciliação): "prontas" exclui as que aguardam revisão —
-  // antes o título dizia 24 prontas e 6 aguardando ao mesmo tempo
-  const prontas = Math.max(0, detail.totalEnriched - review);
+  // G7 (P0 — contadores): "prontas para análise" = identidades confirmadas (com
+  // cadastro localizado). totalEnriched conta a consulta executada, inclusive as 8
+  // linhas "não encontradas" do lote sintético — o título dizia 11 prontas quando
+  // só 3 tinham conteúdo analisável.
+  const prontas = Math.max(0, detail.totalConfirmed);
   // v0.11.0 (Gate 6): painel COMPACTO de uma linha — o resumo do lote não pode
   // comer a primeira dobra da mesa de investigação. O CTA de revisão (antes um
   // banner amarelo separado, ~110px) mora aqui; a explicação longa segue no
@@ -1887,7 +1884,7 @@ const COBERTURA_ESTILO: Record<EstadoCobertura, string> = {
   COMPROVADO: "border-[#BFE3DB] bg-[#F3FAF8] text-[#086B6B]",
   PARCIAL: "border-[#F3E3C2] bg-[#FDF8EE] text-[#9A6B15]",
   NAO_ENCONTRADO: "border-senior-cinza-300 bg-white text-senior-cinza-600",
-  NAO_PESQUISADO: "border-dashed border-senior-cinza-300 bg-transparent text-senior-cinza-400",
+  NAO_PESQUISADO: "border-dashed border-senior-cinza-300 bg-transparent text-senior-cinza-500",
 };
 
 interface DimensaoCobertura {
@@ -2018,7 +2015,7 @@ function CoberturaFactual({ r }: { r: RowDetail }) {
         ))}
       </div>
       {r.research?.modoPesquisa && (
-        <p className="ds-caption mt-2 text-senior-cinza-400">
+        <p className="ds-caption mt-2 text-senior-cinza-500">
           coleta: {r.research.modoPesquisa.toLowerCase()} · {plural(r.research.buscasOk, "busca", "buscas")} com resultado
           {r.research.buscasRecusadasCota > 0 ? ` · ${plural(r.research.buscasRecusadasCota, "recusada", "recusadas")} por cota (pesquisa incompleta)` : ""}
         </p>
@@ -2321,7 +2318,7 @@ function ContactSection({ r }: { r: RowDetail }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h4 className="ds-caption flex items-center gap-1.5 text-senior-cinza-600">
           <Phone className="h-3.5 w-3.5 text-[#00968C]" aria-hidden="true" /> CONTATO PÚBLICO DA CONTA
-          <span className="text-[13px] font-normal tracking-normal text-senior-cinza-400">· do cadastro da Receita</span>
+          <span className="text-[13px] font-normal tracking-normal text-senior-cinza-500">· do cadastro da Receita</span>
         </h4>
         <Button
           size="sm"
@@ -3277,7 +3274,7 @@ function RelacoesSocietariasPanel({ r, batchId, onAbrirPessoa }: { r: RowDetail;
           {/* v0.11.2: busca local + agrupamento por papel + expansão progressiva */}
           {view.totalParticipantes > 5 && (
             <div className="relative">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-senior-cinza-400" aria-hidden="true" />
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-senior-cinza-500" aria-hidden="true" />
               <Input
                 value={buscaPart}
                 onChange={(e) => setBuscaPart(e.target.value)}
@@ -3724,7 +3721,21 @@ function FichaEmpresa({
           {/* v0.10.16: exportação em local PRÓPRIO — fora dos selos de identidade,
               comando explícito único (sem controles repetidos no corpo) */}
           <div className="flex items-center justify-between gap-2 border-t border-senior-cinza-200 pt-2" data-testid="ficha-acoes">
-            <FichaPdfButton batchId={batchId} rowNumber={r.rowNumber} />
+            {/* G7 (P0): ação de dossiê SÓ para registro com conteúdo coletado.
+                Conta não identificada recebe o motivo e a próxima ação (Lotes),
+                nunca um botão de exportação de dossiê vazio. */}
+            {r.lookupStatus === "ENRIQUECIDO" ? (
+              <FichaPdfButton batchId={batchId} rowNumber={r.rowNumber} />
+            ) : (
+              <span
+                className="ds-caption inline-flex items-center gap-1 text-senior-cinza-600"
+                title="Sem dados coletados — identidade não concluída. Ajuste a entrada em Lotes."
+                data-testid={`ficha-pdf-indisponivel-${r.rowNumber}`}
+              >
+                <FileText className="h-3 w-3" aria-hidden="true" />
+                PDF do dossiê indisponível — identidade não concluída (ajuste em Lotes)
+              </span>
+            )}
             {/* v0.10.18 — navegação entre empresas (split/foco): anterior, próxima,
                 ampliar/reduzir, voltar à lista e fechar — a ordem segue a pesquisa e
                 os filtros atuais da lista */}
@@ -4172,7 +4183,7 @@ function FichaEmpresa({
                         </div>
                       ) : (
                         <p className="ds-body flex items-start gap-1.5 text-senior-cinza-600" data-testid="scout-aderencia-vazia">
-                          <CircleHelp className="mt-1 h-3.5 w-3.5 shrink-0 text-senior-cinza-400" aria-hidden="true" />
+                          <CircleHelp className="mt-1 h-3.5 w-3.5 shrink-0 text-senior-cinza-500" aria-hidden="true" />
                           Aderência ainda não comprovada — a pesquisa não encontrou processo observado que conecte esta conta ao portfólio Senior ou a um concorrente identificável.
                         </p>
                       )}
@@ -4204,7 +4215,7 @@ function FichaEmpresa({
                     <ul className="space-y-1">
                       {naoSabemos.map((o, i) => (
                         <li key={i} className="ds-body flex items-start gap-1.5 text-senior-cinza-600">
-                          <CircleHelp className="mt-1 h-3.5 w-3.5 shrink-0 text-senior-cinza-400" aria-hidden="true" />
+                          <CircleHelp className="mt-1 h-3.5 w-3.5 shrink-0 text-senior-cinza-500" aria-hidden="true" />
                           {o}
                         </li>
                       ))}
@@ -5067,7 +5078,12 @@ export function BatchDetailCard({
   // v0.11.3 (missão Lotes+Mesa): CADA botão aplica o CONJUNTO COMPLETO de filtros
   // que define a sua contagem — o número do botão e a tabela filtrada contam
   // sempre o mesmo conjunto (nenhum botão herda um filtro de outro).
-  const nIdentificadas = detail.totalConfirmed + detail.totalDirectCnpj;
+  // G7 (P0 — contadores): o botão conta a MESMA população do filtro que aplica
+  // (resolucao=CONFIRMED). `totalConfirmed + totalDirectCnpj` somava conjuntos
+  // sobrepostos (um CNPJ direto confirmado entrava duas vezes) e exibia 14 em um
+  // lote de 11 linhas. totalDirectCnpj continua disponível para os hints de
+  // cobertura; a contagem de identificadas é a de linhas com identidade confirmada.
+  const nIdentificadas = detail.totalConfirmed;
   const FILTROS_RAPIDOS: { valor: string; label: string; n: number; ativo: boolean; aplicar: () => void }[] = [
     {
       valor: "todas",
@@ -5178,8 +5194,10 @@ export function BatchDetailCard({
   const aguardandoInicio = detail.status === "CONFIRMED" && !detail.processingNow;
   const processable = detail.totalValid + detail.totalReference;
   const coverage = processable > 0 ? Math.min(100, Math.round((detail.totalEnriched / processable) * 100)) : 0;
-  // identificadas = confirmadas pela resolução + entradas que já vieram com CNPJ válido e concluíram
-  const identificadas = detail.totalConfirmed + detail.totalDirectCnpj;
+  // G7 (P0): identificadas = linhas com identidade confirmada (filtro CONFIRMED).
+  // A soma com totalDirectCnpj duplicava linhas que vieram com CNPJ válido E foram
+  // confirmadas pela resolução (14 em um lote de 11).
+  const identificadas = detail.totalConfirmed;
   // v0.10.15 (reconciliação): as 8 leituras do lote ficam explícitas nos hints —
   // entradas × processadas × aguardando × localizadas × compatíveis × revisão × validadas × falhas
   const processadas = Math.max(0, processable - detail.totalPending);
@@ -5202,10 +5220,20 @@ export function BatchDetailCard({
   // abertura é LEITURA do já coletado — nenhuma consulta externa dispara — e a
   // escolha manual (selecaoManual) nunca é sobrescrita; fechar depois do auto-abrir
   // NÃO reabre (autoAbertoLote = id do lote).
+  // G7 (P0 — Lotes × Mesa): a auto-abertura exige resultado único JÁ PRONTO
+  // (dossiêPronto). Conta não identificada/com falha NÃO abre ficha vazia — ela
+  // permanece em Lotes com motivo e próxima ação; a Mesa mostra o estado vazio.
   if (
-    canExport && !active &&
-    rows.length === 1 && (pagination?.total == null || pagination.total === 1) &&
-    !selecaoManual && dossierRowNumber == null && autoAbertoLote !== detail.id
+    deveAutoAbrirFicha({
+      canExport,
+      active,
+      rows,
+      totalNaLista: pagination?.total,
+      selecaoManual,
+      dossierRowNumber,
+      autoAbertoLote,
+      loteId: detail.id,
+    })
   ) {
     setAutoAbertoLote(detail.id);
     setDossierRowNumber(rows[0].rowNumber);
@@ -5242,11 +5270,11 @@ export function BatchDetailCard({
             type="button"
             onClick={f.aplicar}
             aria-pressed={f.ativo}
-            className={`flex h-6 items-center gap-1.5 rounded-full border px-2 text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00968C] ${f.ativo ? "border-[#00968C66] bg-[#00968C14] text-[#086B6B]" : "border-senior-cinza-300 bg-white text-senior-cinza-600 hover:bg-[#F2F2F2]"}`}
+            className={`flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00968C] ${f.ativo ? "border-[#00968C66] bg-[#00968C14] text-[#086B6B]" : "border-senior-cinza-300 bg-white text-senior-cinza-600 hover:bg-[#F2F2F2]"}`}
             data-testid={`filtro-rapido-${f.valor}`}
           >
             {f.label}
-            <span className={`rounded-full px-1.5 text-[11px] tabular-nums ${f.ativo ? "bg-[#00968C26]" : "bg-[#F2F2F2]"}`}>{f.n}</span>
+            <span className={`rounded-full px-1.5 text-[12px] tabular-nums ${f.ativo ? "bg-[#00968C26]" : "bg-[#F2F2F2]"}`}>{f.n}</span>
           </button>
         ))}
       </div>
@@ -5254,7 +5282,7 @@ export function BatchDetailCard({
           cadastral — as duas etapas nunca se confundem (estado, contagem e lugar) */}
       {detail.filaPesquisa && (detail.filaPesquisa.estado === "RODANDO" || detail.filaPesquisa.pendentes.length > 0) && (
         <span
-          className="inline-flex h-6 items-center gap-1 rounded-full border border-senior-cinza-300 bg-white px-2 text-[12px] text-senior-cinza-600"
+          className="inline-flex h-7 items-center gap-1 rounded-full border border-senior-cinza-300 bg-white px-2.5 text-[13px] text-senior-cinza-600"
           data-testid="fila-resumo-barra"
           title="Pesquisa profunda (sob comando) — progresso da fila atual, separado da identificação cadastral"
         >
@@ -5266,7 +5294,7 @@ export function BatchDetailCard({
       {/* v0.11.0 (Gate 6): hint só quando NÃO há ficha aberta — com empresa
           selecionada a dica já cumpriu seu papel e cada linha conta. */}
       {dossierRowNumber == null && (
-        <span className="ds-caption text-senior-cinza-400" data-testid="preview-label">
+        <span className="ds-caption text-senior-cinza-500" data-testid="preview-label">
           {aguardandoInicio ? "os resultados aparecem depois de iniciar a consulta" : "clique na empresa para abrir a ficha ao lado"}
         </span>
       )}
@@ -5288,7 +5316,7 @@ export function BatchDetailCard({
                 onClick={() => setModoVisual(m.valor)}
                 aria-pressed={ativo}
                 title={m.titulo}
-                className={`flex h-6 items-center gap-1 rounded-[6px] px-2 text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00968C] ${ativo ? "bg-[#00968C14] text-[#086B6B]" : "text-senior-cinza-600 hover:bg-[#F2F2F2]"}`}
+                className={`flex h-7 items-center gap-1 rounded-[6px] px-2.5 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00968C] ${ativo ? "bg-[#00968C14] text-[#086B6B]" : "text-senior-cinza-600 hover:bg-[#F2F2F2]"}`}
                 data-testid={`modo-${m.valor}`}
               >
                 <Icone className="h-3.5 w-3.5" aria-hidden="true" />
@@ -5312,21 +5340,25 @@ export function BatchDetailCard({
       {/* CABEÇALHO COMPACTO DA LISTA — pesquisa e filtro principal em uma linha;
           ajustes secundários (visão, colunas, estado da pesquisa) no menu discreto (contrato 6) */}
       <div className="shrink-0 space-y-1.5 border-b border-senior-cinza-200 bg-white/60 px-3 py-1.5" data-testid="lista-cabecalho">
-        <div className="flex items-center gap-2">
-          <div className="relative min-w-0 flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-senior-cinza-400" aria-hidden="true" />
+        {/* R1 (auditoria de UI): no Dividido a coluna da lista tem ~383px e o campo
+            ficava com 223px para um placeholder de 246px. flex-wrap + piso de 176px
+            e linha inteira abaixo de 520px de container devolvem o texto; o filtro
+            e "Ajustes" descem de linha quando não couberem. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-44 flex-1 @max-[520px]:basis-full">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-senior-cinza-500" aria-hidden="true" />
             <Input
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Buscar por empresa, CNPJ ou domínio…"
-              className="h-8 rounded-[8px] border-senior-cinza-300 bg-white pl-9 text-sm placeholder:text-senior-cinza-400"
+              className="h-8 rounded-[8px] border-senior-cinza-300 bg-white pl-9 text-sm placeholder:text-senior-cinza-500"
               aria-label="Buscar entradas"
               data-testid="search-input"
             />
             {search && (
               <button
                 onClick={() => onSearchChange("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-senior-cinza-400 hover:bg-[#F2F2F2]"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-senior-cinza-500 hover:bg-[#F2F2F2]"
                 aria-label="Limpar busca"
                 data-testid="search-clear"
               >
@@ -5336,7 +5368,7 @@ export function BatchDetailCard({
           </div>
           {/* v0.10.12 (painel de decisões): o filtro de situação permanece como filtro principal */}
           <Select value={situationFilter} onValueChange={(v) => onFilterChange({ resolucao: v })}>
-            <SelectTrigger className="h-8 w-32 shrink-0 rounded-[8px] border-senior-cinza-300 bg-white text-[13px]" aria-label="Filtrar por situação" data-testid="filter-situacao">
+            <SelectTrigger className="h-8 w-40 shrink-0 rounded-[8px] border-senior-cinza-300 bg-white text-[13px]" aria-label="Filtrar por situação" data-testid="filter-situacao">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -5367,7 +5399,7 @@ export function BatchDetailCard({
               >
                 <span className="inline-flex w-4 justify-center">{!visaoDetalhada && <Check className="h-3.5 w-3.5 text-[#086B6B]" aria-hidden="true" />}</span>
                 <span className="flex-1">Essencial</span>
-                <span className="ds-caption text-senior-cinza-400">colunas de trabalho</span>
+                <span className="ds-caption text-senior-cinza-500">colunas de trabalho</span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={() => atualizarPrefs({ visaoTabela: "detalhada", colunas: { localizacao: true, atividade: true, situacao: true, porte: true } })}
@@ -5599,7 +5631,7 @@ export function BatchDetailCard({
                         <CircleAlert className="h-3.5 w-3.5" /> Revisar
                       </RowAction>
                     ) : (
-                      <ChevronDown className="h-4 w-4 text-senior-cinza-400" aria-hidden="true" />
+                      <ChevronDown className="h-4 w-4 text-senior-cinza-500" aria-hidden="true" />
                     )}
                   </span>
                 </div>
@@ -5717,12 +5749,12 @@ export function BatchDetailCard({
                           ) : r.cnpjStatus === "DUPLICADA" ? (
                             <span className="ds-body text-senior-cinza-600">Repetida da linha {r.duplicateOf ?? "anterior"}</span>
                           ) : (
-                            <span className="ds-body text-senior-cinza-400">—</span>
+                            <span className="ds-body text-senior-cinza-500">—</span>
                           )}
                           {r.tradeName && r.tradeName !== r.legalName && (
                             <span className="ds-caption block max-w-56 truncate text-senior-cinza-600" title={r.tradeName}>{r.tradeName}</span>
                           )}
-                          <span className="ds-caption block max-w-52 truncate text-senior-cinza-400" title={r.entrada ?? r.referenceValue ?? r.rawCnpj ?? ""}>
+                          <span className="ds-caption block max-w-52 truncate text-senior-cinza-500" title={r.entrada ?? r.referenceValue ?? r.rawCnpj ?? ""}>
                             pista: {r.entrada ?? r.referenceValue ?? (r.rawCnpj ? formatCnpj(r.rawCnpj) : "—")}
                           </span>
                           {(r.foundIsHeadquarters === false || r.resolvedCnpj) && (
@@ -5763,7 +5795,7 @@ export function BatchDetailCard({
                         {r.municipality || r.uf ? (
                           <span className="ds-body whitespace-nowrap text-senior-azul">{r.municipality ? `${r.municipality}/${r.uf ?? ""}` : r.uf}</span>
                         ) : (
-                          <span className="ds-body text-senior-cinza-400">—</span>
+                          <span className="ds-body text-senior-cinza-500">—</span>
                         )}
                       </TableCell>
                     )}
@@ -5773,7 +5805,7 @@ export function BatchDetailCard({
                         {r.cnaeDescription ? (
                           <span className="ds-caption block max-w-44 truncate text-senior-cinza-600" title={r.cnaeDescription}>{r.cnaeDescription}</span>
                         ) : (
-                          <span className="ds-body text-senior-cinza-400">—</span>
+                          <span className="ds-body text-senior-cinza-500">—</span>
                         )}
                       </TableCell>
                     )}
@@ -5782,7 +5814,7 @@ export function BatchDetailCard({
                         {r.registrationStatus ? (
                           <span className={`ds-caption whitespace-nowrap font-medium ${["ATIVA"].includes(r.registrationStatus) ? "text-[#086B6B]" : "text-[#8a6d00]"}`}>{registrationLabel(r.registrationStatus)}</span>
                         ) : (
-                          <span className="ds-body text-senior-cinza-400">—</span>
+                          <span className="ds-body text-senior-cinza-500">—</span>
                         )}
                       </TableCell>
                     )}
@@ -5791,7 +5823,7 @@ export function BatchDetailCard({
                         {r.extra?.porte && !/^demais$/i.test(r.extra.porte) ? (
                           <span className="ds-caption whitespace-nowrap text-senior-cinza-600">{r.extra.porte}</span>
                         ) : (
-                          <span className="ds-body text-senior-cinza-400">—</span>
+                          <span className="ds-body text-senior-cinza-500">—</span>
                         )}
                       </TableCell>
                     )}
@@ -5966,7 +5998,7 @@ export function BatchDetailCard({
             <button
               type="button"
               onClick={() => setResumoExpandido(true)}
-              className="inline-flex items-center gap-1 text-[12.5px] font-medium text-[#086B6B] underline-offset-2 hover:underline"
+              className="inline-flex h-8 items-center gap-1 rounded-[6px] text-[13px] font-medium text-[#086B6B] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00968C]"
               aria-expanded={false}
               data-testid="btn-expandir-resumo"
             >
@@ -5980,7 +6012,7 @@ export function BatchDetailCard({
           <button
             type="button"
             onClick={() => setResumoExpandido(false)}
-            className="inline-flex shrink-0 items-center gap-1 self-start pl-0 pr-4 text-[12.5px] font-medium text-[#086B6B] underline-offset-2 hover:underline"
+            className="inline-flex h-8 shrink-0 items-center gap-1 self-start pl-0 pr-4 text-[13px] font-medium text-[#086B6B] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00968C]"
             aria-expanded={true}
             data-testid="btn-recolher-resumo"
           >
@@ -6101,7 +6133,7 @@ export function BatchDetailCard({
                   Pesquisa profunda: <b className="font-semibold tabular-nums text-senior-azul">{detail.filaPesquisa.concluidas}/{detail.filaPesquisa.concluidas + detail.filaPesquisa.pendentes.length}</b> na fila
                 </span>
               )}
-              <span className="ds-caption ml-auto hidden text-senior-cinza-400 lg:inline">lista e progresso acessíveis por “Voltar à lista”</span>
+              <span className="ds-caption ml-auto hidden text-senior-cinza-500 lg:inline">lista e progresso acessíveis por “Voltar à lista”</span>
             </div>
           )}
           <ResizablePanelGroup

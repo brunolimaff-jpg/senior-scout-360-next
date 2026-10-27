@@ -207,13 +207,13 @@ export function PessoaDossieSheet({
                 <div className="rounded-[10px] border border-senior-cinza-300 bg-white p-3">
                   <p className="ds-caption text-senior-cinza-600">Empresas distintas (raízes)</p>
                   <p className="text-xl font-bold tabular-nums text-senior-azul" data-testid="pessoa-raizes">{pessoa.raizesDistintas}</p>
-                  <p className="ds-caption mt-0.5 text-[11px] leading-tight text-senior-cinza-400">deste lote + quadro público coletado</p>
+                  <p className="ds-caption mt-0.5 text-[11px] leading-tight text-senior-cinza-500">deste lote + quadro público coletado</p>
                 </div>
                 <div className="rounded-[10px] border border-senior-cinza-300 bg-white p-3">
                   <p className="ds-caption text-senior-cinza-600">Estabelecimentos citados</p>
                   <p className="text-xl font-bold tabular-nums text-senior-azul" data-testid="pessoa-estabelecimentos">{pessoa.estabelecimentosCitados}</p>
                   {pessoa.quadro && (
-                    <p className="ds-caption mt-0.5 text-[11px] leading-tight text-senior-cinza-400" data-testid="pessoa-escopo-coleta">
+                    <p className="ds-caption mt-0.5 text-[11px] leading-tight text-senior-cinza-500" data-testid="pessoa-escopo-coleta">
                       coleta: {pessoa.quadro.totalEmpresas} na fonte · {pessoa.quadro.empresas.length} exibidos{pessoa.quadro.empresasOcultas > 0 ? ` (+${pessoa.quadro.empresasOcultas} no teto de exibição)` : ""}
                     </p>
                   )}
@@ -334,12 +334,12 @@ export function PessoaDossieSheet({
                       </p>
                       {pessoa.quadro && pessoa.quadro.empresas.length > 4 && (
                         <div className="relative mt-2">
-                          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-senior-cinza-400" aria-hidden="true" />
+                          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-senior-cinza-500" aria-hidden="true" />
                           <input
                             value={buscaEmpresa}
                             onChange={(e) => setBuscaEmpresa(e.target.value)}
                             placeholder="Buscar empresa relacionada por nome, raiz ou CNPJ…"
-                            className="h-8 w-full rounded-[8px] border border-senior-cinza-300 bg-white pl-8 pr-2 text-[13px] placeholder:text-senior-cinza-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00968C]"
+                            className="h-8 w-full rounded-[8px] border border-senior-cinza-300 bg-white pl-8 pr-2 text-[13px] placeholder:text-senior-cinza-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00968C]"
                             aria-label="Buscar empresa relacionada por nome, raiz ou CNPJ"
                             data-testid="pessoa-busca-empresa"
                           />

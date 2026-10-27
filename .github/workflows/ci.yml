@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: ["g7/**", "main"]
+  pull_request:
+
+jobs:
+  qualidade:
+    name: Qualidade (tipos, lint, unitários, build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+      - name: Instalar dependências
+        run: bun install --frozen-lockfile
+      - name: Gerar Prisma Client
+        run: bunx prisma generate
+      - name: TypeScript (escopo src/ — build usa ignoreBuildErrors)
+        run: bunx tsc --noEmit -p tsconfig.src-check.json
+      - name: Lint
+        run: bun run lint
+      - name: Testes unitários
+        run: bun test tests/unit
+      - name: Build
+        env:
+          DATABASE_URL: file:./db/ci.db
+        run: bunx next build
+
+  regressao:
+    name: Regressão (suítes priorizadas, banco de CI)
+    needs: qualidade
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+      - name: Renderização de PDF (pdftoppm)
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils
+      - name: Instalar dependências
+        run: bun install --frozen-lockfile
+      - name: Gerar Prisma Client
+        run: bunx prisma generate
+      - name: Banco de CI
+        env:
+          DATABASE_URL: file:./db/ci.db
+        run: bunx prisma db push --skip-generate
+      - name: Subir aplicação (rotas reais de export)
+        env:
+          DATABASE_URL: file:./db/ci.db
+        run: |
+          bunx next build
+          (bunx next start -p 3000 > app.log 2>&1 &)
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:3000/api/auth/session -o /dev/null && break
+            sleep 2
+          done
+          curl -sf http://127.0.0.1:3000/api/auth/session -o /dev/null
+      - name: Suítes de regressão
+        env:
+          DATABASE_URL: file:./db/ci.db
+        run: |
+          bun run scripts/test-v01012-identidade.ts
+          bun run scripts/test-v01015-exportacoes.ts
+          bun run scripts/test-v01024-lab-route.ts
+          bun run scripts/test-v0111-pdf-v4.ts
+          bun run scripts/test-v0111-pessoas-reversa.ts
+          bun run scripts/test-v0103-regressoes.ts

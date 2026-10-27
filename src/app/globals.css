@@ -68,7 +68,8 @@
   --color-senior-pagina: #F6F9FE;           /* --cinza-azulado — fundo de página */
   --color-senior-cinza-900: #3B3D3D;
   --color-senior-cinza-600: #5F5C57;        /* --cinza-600 — texto secundário (v0.10.11: escurecido p/ contraste AA em 13px — era #77736E) */
-  --color-senior-cinza-400: #9C9C9C;        /* --cinza-400 */
+  --color-senior-cinza-500: #6E6B66;        /* --cinza-500 — texto de apoio AA (5,31:1 no branco; R1 da auditoria de UI) */
+  --color-senior-cinza-400: #9C9C9C;        /* --cinza-400 — só traço/decorativo: 2,75:1 reprova AA como texto */
   --color-senior-cinza-300: #D4D4D4;        /* --cinza-300 — bordas */
   --color-senior-cinza-100: #F2F2F2;        /* --cinza-100 — superfície neutra */
 }
@@ -92,6 +93,7 @@
   --cinza-azulado: #F6F9FE;
   --cinza-900: #3B3D3D;
   --cinza-600: #5F5C57; /* v0.10.11: contraste AA em textos pequenos (era #77736E) */
+  --cinza-500: #6E6B66; /* R1: texto de apoio AA (5,31:1 no branco) */
   --cinza-400: #9C9C9C;
   --cinza-300: #D4D4D4;
   --cinza-100: #F2F2F2;
