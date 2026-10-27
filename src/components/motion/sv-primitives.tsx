@@ -157,7 +157,7 @@ export function EmptyStateRow({
           className="flex min-h-52 flex-col items-center justify-center gap-2 p-6 text-center"
           data-testid={testId}
         >
-          {Icon ? <Icon strokeWidth={1.4} className="h-8 w-8 text-senior-cinza-400" aria-hidden="true" /> : null}
+          {Icon ? <Icon strokeWidth={1.4} className="h-8 w-8 text-senior-cinza-500" aria-hidden="true" /> : null}
           <p className="text-sm font-semibold text-senior-azul">{title}</p>
           {description ? <p className="max-w-sm text-xs leading-5 text-senior-cinza-600">{description}</p> : null}
           {actionLabel && onAction ? (

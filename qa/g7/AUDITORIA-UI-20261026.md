@@ -65,3 +65,54 @@ Cada rodada: `npm run verify` + `build` + screenshots 1280. Viewports 1366/1440 
 ## Capturas
 
 `qa/g7/auditoria/`: `entrada-hero.png`, `entrada-historico.png`, `mesa-b-topo.png`, `mesa-b-ficha.png`, `mesa-b-foco.png`, `mesa-a-vazia.png`, `mesa-a-ficha-revisao.png`, `duplicacao-topo.png`. Retorno do Planejador capturado em `qa/g7/planejador-retorno-20261026.png`.
+
+---
+
+## Execução da R1 — 27/10/2026
+
+**Escopo:** achados 1 (busca truncada), 4 (microcontroles) e 7 (contraste `cinza-400`).
+Achados 2, 3, 5, 6, 8, 9, 10 e 11 permanecem para R2–R4, sem alteração nesta rodada.
+
+### Alterações
+
+| # | Arquivo | Mudança |
+|---|---------|---------|
+| 1 | `src/components/cnpj/batch-detail-card.tsx` | Cabeçalho da lista em `flex-wrap`; busca com piso `min-w-44` e `basis-full` abaixo de 520px de container (`@max-[520px]`) — no Dividido o campo passa a ocupar a linha inteira |
+| 2 | idem | Select de situação de `w-32` (128px) para `w-40` (160px) — "Todas as situações" truncava |
+| 3 | idem | Chips de filtro rápido e botões de modo: `h-6`/12px → `h-7` (28px)/13px; contador interno 11px → 12px; chip da fila de pesquisa e "Ajustes" no mesmo piso |
+| 4 | idem | "Resumo completo"/"Recolher": texto 12,5px solto → alvo de 32px (`h-8`) com 13px e anel de foco |
+| 5 | `src/app/globals.css` | Novo token `cinza-500` = `#6E6B66` (5,31:1 no branco). `cinza-400` fica só para traço/decorativo |
+| 6 | 9 arquivos em `src/` | 53 ocorrências de `text-senior-cinza-400` → `text-senior-cinza-500` |
+
+### Medições em runtime (1280×720, lote `cenario-b-sintetico`, modo Dividido)
+
+| Métrica | Antes | Depois | Critério | Estado |
+|---------|-------|--------|----------|--------|
+| Largura do campo de busca | 50px (auditoria 26/10) / 223px (medido no início da R1) | **359px** | ≥ 246px (texto do placeholder) | PASSA |
+| Placeholder inteiro visível | não | **sim** (246px de texto em 315px de área) | legível sem truncar | PASSA |
+| Select "Todas as situações" | 128px, truncado | **160px**, inteiro | texto completo | PASSA |
+| Menor altura de controle clicável | 24px | **28px** | ≥ 28px | PASSA |
+| Controles abaixo de 28px | 8 | **0** | 0 | PASSA |
+| Contraste do texto de apoio | 2,94:1 (WCAG 3,0 sem arredondar) | **5,31:1** | ≥ 4,5:1 | PASSA |
+| Overflow horizontal em 1280 / 1440 | ausente | **ausente** (`docW` 1265/1425) | sem overflow | PASSA |
+| Modo Lista em 1440 | — | busca 1075px, select 160px, `docW` 1425 | íntegro | PASSA |
+
+### Gates executados
+
+| Gate | Comando | Resultado |
+|------|---------|-----------|
+| TypeScript (src) | `bunx tsc --noEmit -p tsconfig.src-check.json` | 0 erros |
+| Lint | `bun run lint` | 0 erros |
+| Testes unitários | `bun test tests/unit` | 9/9 pass |
+| Build | `bunx next build` | sucesso (compilou em 21,6s) |
+
+### Limites desta rodada
+
+- **NÃO VERIFICADO:** 1366px e painel lateral estreito (medido 1280 e 1440 apenas).
+- **NÃO VERIFICADO:** leitor de tela e travessia real de Tab no novo anel de foco.
+- Verificação visual usada no lugar de diff de pixel: valores computados lidos no DOM (largura do campo, altura dos controles, razão de contraste calculada com a cor renderizada).
+- Banco do operador intocado: a sessão usou a cópia `db/r1-audit.db`.
+
+### Capturas
+
+`qa/g7/auditoria-r1/`: `r1-antes-busca-223px.jpg` (estado anterior, busca em 223px), `r1-depois-dividido.jpg` (1280, busca inteira e Ajustes na 2ª linha), `r1-depois-foco.jpg` (modo Foco com ficha aberta).

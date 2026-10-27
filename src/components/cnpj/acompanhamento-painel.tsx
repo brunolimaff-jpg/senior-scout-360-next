@@ -50,7 +50,7 @@ export function AcompanhamentoStrip({ detail }: { detail: BatchDetail }) {
           value={detail.rowCount}
           hint={`${plural(detail.rowCount, "linha recebida", "linhas recebidas")} na planilha/pistas deste lote`}
         />
-        <ArrowRight className="h-3 w-3 shrink-0 text-senior-cinza-400" aria-hidden="true" />
+        <ArrowRight className="h-3 w-3 shrink-0 text-senior-cinza-500" aria-hidden="true" />
 
         {/* etapa 2 — cadastros identificados (dimensão cadastral, não dossiê) */}
         <StageChip
@@ -60,7 +60,7 @@ export function AcompanhamentoStrip({ detail }: { detail: BatchDetail }) {
           tone="verde"
           hint={`${plural(prontas, "conta com identidade confirmada", "contas com identidade confirmada")} — cadastro público localizado, ainda sem pesquisa profunda`}
         />
-        <ArrowRight className="h-3 w-3 shrink-0 text-senior-cinza-400" aria-hidden="true" />
+        <ArrowRight className="h-3 w-3 shrink-0 text-senior-cinza-500" aria-hidden="true" />
 
         {/* etapa 3 — identidades aguardando decisão humana */}
         <StageChip
@@ -70,7 +70,7 @@ export function AcompanhamentoStrip({ detail }: { detail: BatchDetail }) {
           tone={detail.totalReview > 0 ? "atencao" : "neutro"}
           hint={`${plural(detail.totalReview, "identidade aguardando", "identidades aguardando")} sua decisão — a conta segue em Lotes até a revisão`}
         />
-        <ArrowRight className="h-3 w-3 shrink-0 text-senior-cinza-400" aria-hidden="true" />
+        <ArrowRight className="h-3 w-3 shrink-0 text-senior-cinza-500" aria-hidden="true" />
 
         {/* etapa 4 — pesquisa profunda: sub-estágios honestos, sem percentual único */}
         <span
@@ -84,7 +84,7 @@ export function AcompanhamentoStrip({ detail }: { detail: BatchDetail }) {
           <span className="ds-caption text-senior-cinza-600">pronto{pp.dossiesProntos === 1 ? "" : "s"}</span>
           {emExecucao > 0 && (
             <>
-              <span className="ds-caption text-senior-cinza-400">·</span>
+              <span className="ds-caption text-senior-cinza-500">·</span>
               <Loader2 className="h-3 w-3 animate-spin text-[#086B6B]" aria-hidden="true" />
               <span className="ds-caption font-semibold tabular-nums text-[#086B6B]" data-testid="acc-pesquisa-executando">{emExecucao}</span>
               <span className="ds-caption text-senior-cinza-600">executando</span>
@@ -92,7 +92,7 @@ export function AcompanhamentoStrip({ detail }: { detail: BatchDetail }) {
           )}
           {naFila > 0 && (
             <>
-              <span className="ds-caption text-senior-cinza-400">·</span>
+              <span className="ds-caption text-senior-cinza-500">·</span>
               <Clock className="h-3 w-3 shrink-0 text-senior-cinza-600" aria-hidden="true" />
               <span className="ds-caption font-semibold tabular-nums text-senior-cinza-600" data-testid="acc-pesquisa-fila">{naFila}</span>
               <span className="ds-caption text-senior-cinza-600">na fila</span>
@@ -100,7 +100,7 @@ export function AcompanhamentoStrip({ detail }: { detail: BatchDetail }) {
           )}
           {pp.falhas > 0 && (
             <>
-              <span className="ds-caption text-senior-cinza-400">·</span>
+              <span className="ds-caption text-senior-cinza-500">·</span>
               <CircleAlert className="h-3 w-3 shrink-0 text-[#8a6d00]" aria-hidden="true" />
               <span className="ds-caption font-semibold tabular-nums text-[#8a6d00]" data-testid="acc-pesquisa-falhas">{pp.falhas}</span>
               <span className="ds-caption text-senior-cinza-600">falha{pp.falhas === 1 ? "" : "s"}</span>
@@ -108,13 +108,13 @@ export function AcompanhamentoStrip({ detail }: { detail: BatchDetail }) {
           )}
           {interrompida && (
             <>
-              <span className="ds-caption text-senior-cinza-400">·</span>
+              <span className="ds-caption text-senior-cinza-500">·</span>
               <PauseCircle className="h-3 w-3 shrink-0 text-[#8C2F39]" aria-hidden="true" />
               <span className="ds-caption font-medium text-[#8C2F39]" data-testid="acc-pesquisa-pausada">fila pausada</span>
             </>
           )}
         </span>
-        <ArrowRight className="h-3 w-3 shrink-0 text-senior-cinza-400" aria-hidden="true" />
+        <ArrowRight className="h-3 w-3 shrink-0 text-senior-cinza-500" aria-hidden="true" />
 
         {/* etapa 5 — dossiês prontos: resultado da investigação solicitada.
             CONTRATO: 11 identificadas com 3 prontas NÃO são 11 dossiês —
@@ -252,7 +252,7 @@ function StageChip({
   testId: string;
 }) {
   const valueTone =
-    tone === "verde" ? "text-[#00968C]" : tone === "atencao" ? "text-[#8a6d00]" : value === 0 ? "text-senior-cinza-400" : "text-senior-azul";
+    tone === "verde" ? "text-[#00968C]" : tone === "atencao" ? "text-[#8a6d00]" : value === 0 ? "text-senior-cinza-500" : "text-senior-azul";
   const border = tone === "atencao" ? "border-[#FFC51166] bg-[#FFC51114]" : tone === "verde" ? "border-[#00968C40] bg-[#00968C0A]" : "border-senior-cinza-300 bg-white";
   return (
     <span

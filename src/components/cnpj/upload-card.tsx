@@ -278,7 +278,7 @@ export function UploadCard({
                       <div className="cnpj-scroll mt-2 max-h-24 overflow-y-auto rounded-[8px] border border-senior-cinza-300 bg-white p-2 text-[13px] leading-relaxed" aria-hidden="true">
                         {live.lines.slice(0, 12).map((l) => (
                           <div key={l.rowNumber} className="flex items-center gap-2 truncate">
-                            <span className="w-6 shrink-0 text-right tabular-nums text-senior-cinza-400">{l.rowNumber}</span>
+                            <span className="w-6 shrink-0 text-right tabular-nums text-senior-cinza-500">{l.rowNumber}</span>
                             <span className="min-w-0 flex-1 truncate text-senior-azul">{l.rawLine}</span>
                             <span className={`shrink-0 font-medium ${
                               l.kind === "CNPJ" ? (l.cnpjValid ? "text-[#086B6B]" : "text-[#8C2F39]") :
@@ -289,7 +289,7 @@ export function UploadCard({
                             </span>
                           </div>
                         ))}
-                        {live.lines.length > 12 && <p className="ds-caption mt-1 text-senior-cinza-400">+ {plural(live.lines.length - 12, "linha", "linhas")}…</p>}
+                        {live.lines.length > 12 && <p className="ds-caption mt-1 text-senior-cinza-500">+ {plural(live.lines.length - 12, "linha", "linhas")}…</p>}
                       </div>
                     )}
                   </div>

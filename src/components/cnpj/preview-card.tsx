@@ -156,7 +156,7 @@ export function PreviewCard({
               {isText
                 ? (sample as unknown as TextSampleRow[]).map((row) => (
                     <TableRow key={row.rowNumber} data-testid={`preview-row-${row.rowNumber}`}>
-                      <TableCell className="ds-caption tabular-nums text-senior-cinza-400">{row.rowNumber}</TableCell>
+                      <TableCell className="ds-caption tabular-nums text-senior-cinza-500">{row.rowNumber}</TableCell>
                       <TableCell className="max-w-56 truncate ds-body text-senior-azul" title={row.entrada}>{row.entrada}</TableCell>
                       <TableCell><TextKindBadge kind={row.kind} valido={row.valido} /></TableCell>
                       <TableCell className="max-w-52 truncate ds-caption text-senior-cinza-600" title={row.motivo ?? ""}>

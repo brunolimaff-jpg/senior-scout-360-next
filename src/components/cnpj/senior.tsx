@@ -297,7 +297,7 @@ export function BatchStateBadge({ status }: { status: string }) {
 
 /** Chip de confiança (Alta / Média / Baixa / Confirmado por você). */
 export function TrustChip({ confidence }: { confidence: string | null }) {
-  if (!confidence) return <span className="text-sm text-senior-cinza-400">—</span>;
+  if (!confidence) return <span className="text-sm text-senior-cinza-500">—</span>;
   if (confidence === "HUMANA") {
     return (
       <span className="inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-full border border-[#00968C40] bg-white px-2 py-0.5 text-[13px] font-medium text-[#086B6B]" title={CONFIDENCE.HUMANA}>
@@ -414,7 +414,7 @@ export function RowAction({ onClick, disabled, children, testId, title }: { onCl
       disabled={disabled}
       title={title}
       data-testid={testId}
-      className="h-8 gap-1.5 rounded-[5px] px-2 text-[13px] font-medium text-[#086B6B] hover:bg-[#00968C14] hover:text-[#086B6B] disabled:text-senior-cinza-400"
+      className="h-8 gap-1.5 rounded-[5px] px-2 text-[13px] font-medium text-[#086B6B] hover:bg-[#00968C14] hover:text-[#086B6B] disabled:text-senior-cinza-500"
     >
       {children}
     </Button>

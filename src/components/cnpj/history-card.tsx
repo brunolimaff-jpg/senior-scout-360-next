@@ -109,7 +109,7 @@ export function HistoryCard({
                 </Badge>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-senior-cinza-400 hover:bg-[#FDECEC] hover:text-[#8C2F39]" aria-label={`Arquivar ${h.fileName}`} data-testid={`history-delete-${h.id}`}>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-senior-cinza-500 hover:bg-[#FDECEC] hover:text-[#8C2F39]" aria-label={`Arquivar ${h.fileName}`} data-testid={`history-delete-${h.id}`}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </AlertDialogTrigger>
