@@ -2,10 +2,13 @@
 
 ## Estado atual — 03/11/2026
 
-- G8.4 **implementado**: `writeQueue` (update cego) substituído por CAS na string JSON exata, com dono, heartbeat de 30 s, releitura entre contas e parada ao perder a posse. Módulo puro novo `src/lib/enrich/research-queue-state.ts`. Corrigida a dupla contagem de `puladas`.
+- Narrativa curada: `C:\Users\bruno.ferreira\OneDrive - Senior Sistemas SA\Documentos\Bruno Vault\Sessões\2026-11\2026-11-03T17-27-10-scout-360-g8-4-claim-fila.md`.
+- G8.4 **implementado e enviado**: `writeQueue` (update cego) substituído por CAS na string JSON exata, com dono, heartbeat de 30 s, releitura entre contas e parada ao perder a posse. Módulo puro novo `src/lib/enrich/research-queue-state.ts`. Corrigida a dupla contagem de `puladas`.
+- PR #3 em head `b6030a8`, Draft, sem merge; corpo reescrito. PR #1 e Issue #2 intocados.
 - Gates verdes: tsc, lint, 17 unitários, build limpo, `test:postgres`, race test e smoke pela API real (12 PASS). Suítes curadas: 40/40, 71/71, 8/8, 37/37, 50/50; PDF v4 falha só por `pdftoppm` ausente, igual no commit base.
 - Recibo L6: `C:\Users\bruno.ferreira\OneDrive - Senior Sistemas SA\Documentos\Projetos\Scout 360 - Enriquecimento de Contas\G8-recibo-L6-20261103.md`.
 - NAO VERIFICADO: duas instâncias Next reais disputando a mesma fila em produção; `runBatch` completo; cancelamento externo; grants/RLS no Supabase; deploy.
+- Working tree limpo exceto `next-env.d.ts` (gerado pelo build) e `skills-lock.json` (artefato do vinext); nenhum dos dois deve ser commitado.
 
 ## Estado anterior — 29/10/2026
 
@@ -27,6 +30,6 @@
 
 - G8.4 implementado e enviado no PR #3. O que resta para fechar o item: exercitar DUAS instâncias Next reais sobre o mesmo banco e conferir que só uma executa cada conta. O CAS e a sequência do engine estão provados no banco, não em dois processos vivos.
 - Próximo: retorno ao Planejador com o recibo L6 e o diff do PR #3.
-- Ler issue G8 e retorno do Planejador; revisar e validar diff local, preservando testes e `next-env.d.ts`. Commit/push só quando Bruno solicitar; PRs permanecem Draft.
+- Ler issue G8 e retorno do Planejador. PRs permanecem Draft; merge, deploy e migration remota só com autorização específica.
 - Continuar segurança e arquitetura com validação local, sem Actions. Antes de migration remota, dados reais, permissões, contratação, merge ou deploy: autorização específica.
 - OPEN é desenvolvimento local, não autorização para expor dados reais. Provedor de IA permanece em aberto. Não delegar a modelos de fronteira sem permissão explícita de Bruno.

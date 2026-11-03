@@ -1,6 +1,6 @@
 # decisions — Scout 360
 
-- 2026-11-03 (Bruno): implementar e enviar o claim distribuído da fila de pesquisa. Feito: CAS na string JSON exata (mesmo padrão do lease de lote), `dono` + heartbeat de 30 s, releitura entre contas; `writeQueue` cego removido.
+- 2026-11-03 (Bruno): implementar e enviar o claim distribuído da fila de pesquisa. Feito: CAS na string JSON exata (mesmo padrão do lease de lote), `dono` + heartbeat de 30 s, releitura entre contas; `writeQueue` cego removido. ADR: `Projetos/Scout-360/Decisões/2026-11-03-claim-distribuido-da-fila.md`.
 - 2026-10-27 (Bruno): Supabase/PostgreSQL é direção para persistência do Scout existente; criação do projeto autorizada, não migração real nem deploy.
 - 2026-10-27 (Bruno): GitHub Actions desativado por cota; não reativar nem criar CI remota sem autorização. Verificações locais.
 - 2026-10-27 (Bruno): não delegar a modelos de fronteira sem permissão explícita.

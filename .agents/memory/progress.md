@@ -4,6 +4,7 @@
 - CAS da fila (string JSON exata) com dono, heartbeat de 30 s, releitura entre contas e parada ao perder posse; módulo puro `src/lib/enrich/research-queue-state.ts`; 8 testes unitários novos.
 - Smoke pela API real (12 PASS) achou e confirmou correção da dupla contagem de `puladas`.
 - Gates: tsc, lint, 17 unitários, build limpo, `test:postgres`, race test, suítes curadas (PDF v4 falha só por `pdftoppm` ausente, igual no base).
+- Enviado: `b6030a8` no PR #3 (Draft); corpo do PR reescrito. Sessão: Vault `Sessões/2026-11/2026-11-03T17-27-10-scout-360-g8-4-claim-fila.md`. Decisão: `Projetos/Scout-360/Decisões/2026-11-03-claim-distribuido-da-fila.md`.
 
 ## 2026-11-03 — G8.4 medido, commit local
 - Retomada do handoff de 29/10. Gates locais reexecutados: tsc 0, lint 0, unit 9/9, build OK, `test:postgres` PASS.
