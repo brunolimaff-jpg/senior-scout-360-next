@@ -1,0 +1,16 @@
+{
+  "name": "scout-g8-postgres-lab",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node test-prisma.mjs",
+    "test:postgres": "node test-postgres-real.mjs"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "0.5.12",
+    "@electric-sql/pglite-socket": "0.2.15"
+  },
+  "devDependencies": {
+    "embedded-postgres": "^17.6.0-beta.15"
+  }
+}

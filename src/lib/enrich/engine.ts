@@ -20,6 +20,12 @@ import { buildResearchPacket, toModelInput, type ModoPesquisa, type ResearchPack
 import { extractClues, resolveIdentity, resolveMatriz, type Clues, type IdentityResolution } from "@/lib/resolve";
 import { avaliarIdentidade } from "@/lib/resolve/confianca";
 import { newRunId, patchTelemetry, recordTelemetry, runWithTelemetry } from "@/lib/telemetry";
+import {
+  mayClaimQueue,
+  parseQueueState,
+  serializeQueue,
+  type ResearchQueueState,
+} from "@/lib/enrich/research-queue-state";
 
 export const UPLOAD_DIR = path.join(process.cwd(), "upload");
 
@@ -1747,20 +1753,7 @@ export async function startDeepResearch(batchId: string, rowNumber: number, modo
  * - Retomada sem repetir chamadas: linha com pacote fresco e completo é PULADA (o
  *   runDeepResearch interno também reutiliza pacote salvo — dupla proteção).
  */
-export interface ResearchQueueState {
-  rowNumbers: number[];
-  estado: "RODANDO" | "PAUSADA" | "CONCLUIDA" | "PARADA";
-  /** modo de coleta da pesquisa (COMPLETO = pipeline integral; ADAPTATIVO = níveis 0/1/2) */
-  modoPesquisa: ModoPesquisa;
-  /** índice da próxima conta a processar (durável — retomada começa daqui) */
-  posicao: number;
-  motivoPausa: string | null;
-  solicitadoEm: string;
-  heartbeat: string;
-  concluidas: number;
-  puladas: number;
-  falhas: number;
-}
+export type { ResearchQueueState } from "@/lib/enrich/research-queue-state";
 
 const Q_HEARTBEAT_STALE_MS = 3 * 60_000; // fila sem heartbeat há mais tempo = executor morreu
 
@@ -1771,24 +1764,55 @@ const qg = globalThis as unknown as QueueGlobal;
 qg.__scoutResearchQueues ??= new Set<string>();
 const researchQueueRunners = qg.__scoutResearchQueues;
 
-function parseQueue(json: string | null): ResearchQueueState | null {
-  if (!json) return null;
-  try {
-    const v = JSON.parse(json) as ResearchQueueState;
-    if (!v || !Array.isArray(v.rowNumbers) || typeof v.estado !== "string") return null;
-    return v;
-  } catch {
-    return null;
-  }
+/* ---- Claim distribuído da fila de pesquisa (G8.4) ----
+ * O lease do lote (claimBatchLease) NÃO cobre a fila: `researchQueueJson` era gravado
+ * com update cego, então dois processos sobre o mesmo banco liam o mesmo estado e
+ * ambos tinham a escrita aceita — a mesma conta podia ser pesquisada duas vezes.
+ * Aqui a exclusividade vem do mesmo padrão do lease: updateMany CONDICIONAL na string
+ * exata recém-lida (CAS). Quem perde o CAS relê e recomeça; o dono renova o heartbeat
+ * e, se outro assume, o executor antigo percebe e para sem duplicar trabalho.
+ */
+const Q_OWNER_RENEW_MS = 30_000; // renovação do dono (Q_HEARTBEAT_STALE_MS = 4 perdas)
+
+const go = globalThis as unknown as { __scoutQueueExecId?: string };
+go.__scoutQueueExecId ??= `q_${process.pid}_${Math.random().toString(36).slice(2, 8)}`;
+const QUEUE_EXECUTOR_ID = go.__scoutQueueExecId;
+
+async function readQueueRaw(batchId: string): Promise<{ raw: string | null; state: ResearchQueueState | null }> {
+  const b = await db.importBatch.findUnique({ where: { id: batchId }, select: { researchQueueJson: true } });
+  const raw = b?.researchQueueJson ?? null;
+  return { raw, state: parseQueueState(raw) };
 }
 
 async function readQueue(batchId: string): Promise<ResearchQueueState | null> {
-  const b = await db.importBatch.findUnique({ where: { id: batchId }, select: { researchQueueJson: true } });
-  return parseQueue(b?.researchQueueJson ?? null);
+  return (await readQueueRaw(batchId)).state;
 }
 
-async function writeQueue(batchId: string, state: ResearchQueueState): Promise<void> {
-  await db.importBatch.update({ where: { id: batchId }, data: { researchQueueJson: JSON.stringify(state) } });
+/**
+ * CAS: grava `next` somente se o banco ainda contém `expectedRaw` — a string que o
+ * chamador leu. `null` significa "a fila não existe". Retorna true se esta chamada ganhou.
+ */
+async function casQueue(batchId: string, expectedRaw: string | null, next: ResearchQueueState): Promise<boolean> {
+  const res = await db.importBatch.updateMany({
+    where: { id: batchId, researchQueueJson: expectedRaw },
+    data: { researchQueueJson: serializeQueue(next) },
+  });
+  return res.count === 1;
+}
+
+/**
+ * Retoma uma fila sem dono vivo. O CAS garante UM vencedor entre processos; os perdedores
+ * apenas saem. Usado no sweep de restart e não substitui o claim do executor.
+ */
+async function claimOrphanQueue(
+  batchId: string
+): Promise<{ state: ResearchQueueState; raw: string } | null> {
+  const { raw, state } = await readQueueRaw(batchId);
+  if (!state || raw === null) return null;
+  if (!mayClaimQueue(state, QUEUE_EXECUTOR_ID, Date.now(), Q_HEARTBEAT_STALE_MS)) return null;
+  const next: ResearchQueueState = { ...state, dono: QUEUE_EXECUTOR_ID, heartbeat: new Date().toISOString() };
+  const nextRaw = serializeQueue(next);
+  return (await casQueue(batchId, raw, next)) ? { state: next, raw: nextRaw } : null;
 }
 
 /** Pacote salvo é fresco (<24 h), completo e sem recusa de cota → a fila PULA sem novas chamadas. */
@@ -1836,7 +1860,7 @@ export async function startResearchQueue(
     return { ok: false, error: "As contas selecionadas ainda não têm dados públicos prontos — conclua a identificação e a consulta primeiro." };
   }
 
-  const existing = await readQueue(batchId);
+  const { raw: existingRaw, state: existing } = await readQueueRaw(batchId);
   const novas = elegiveis.map((r) => r.rowNumber);
   let state: ResearchQueueState;
   if (existing && (existing.estado === "RODANDO" || existing.estado === "PAUSADA" || existing.estado === "PARADA")) {
@@ -1851,10 +1875,13 @@ export async function startResearchQueue(
       modoPesquisa: modo, // modo da última seleção vence (auditoria registra a troca)
       motivoPausa: null,
       heartbeat: new Date().toISOString(),
+      // `dono` NÃO muda aqui: se a fila já roda, quem está executando continua dono.
+      // O executor vivo descobre as novas contas pelo tamanho de rowNumbers.
     };
   } else {
-    // fila nova (ou anterior CONCLUIDA): contadores zerados, ordem da planilha
-    const jaComPacote = elegiveis.filter(packetFresco).length;
+    // fila nova (ou anterior CONCLUIDA): contadores zerados, ordem da planilha.
+    // `puladas` começa em 0 e é contado pelo executor: pré-carregar o número de pacotes
+    // frescos contava a mesma linha duas vezes (ao iniciar e de novo ao pular).
     state = {
       rowNumbers: novas,
       estado: "RODANDO",
@@ -1864,11 +1891,16 @@ export async function startResearchQueue(
       solicitadoEm: new Date().toISOString(),
       heartbeat: new Date().toISOString(),
       concluidas: 0,
-      puladas: jaComPacote,
+      puladas: 0,
       falhas: 0,
+      dono: null,
     };
   }
-  await writeQueue(batchId, state);
+  // CAS: se o executor avançou entre a leitura e aqui, o pedido do operador não pode
+  // sobrescrever o progresso — relê e reaplica a intenção sobre o estado atual.
+  if (!(await casQueue(batchId, existingRaw, state))) {
+    return startResearchQueue(batchId, rowNumbersInput, modo);
+  }
   await recordAudit(batchId, "RESEARCH_QUEUE_START", {
     contas: state.rowNumbers.length,
     novas: novas.length,
@@ -1881,62 +1913,138 @@ export async function startResearchQueue(
 
 /** Interrompe a fila SEM perder o trabalho concluído (as pendentes ficam pendentes). */
 export async function stopResearchQueue(batchId: string): Promise<{ ok: boolean; error?: string; estado?: ResearchQueueState }> {
-  const state = await readQueue(batchId);
-  if (!state) return { ok: false, error: "Nenhuma fila de pesquisa ativa neste lote." };
+  const { raw, state } = await readQueueRaw(batchId);
+  if (!state || raw === null) return { ok: false, error: "Nenhuma fila de pesquisa ativa neste lote." };
   if (state.estado !== "RODANDO") return { ok: true, estado: state };
   const novo: ResearchQueueState = {
     ...state,
     estado: "PARADA",
     motivoPausa: "Interrompida pelo operador — as contas já pesquisadas mantêm o dossiê; as restantes continuam na fila para retomada.",
     heartbeat: new Date().toISOString(),
+    dono: null,
   };
-  await writeQueue(batchId, novo);
+  // CAS: se o executor gravou (posicao/heartbeat) entre a leitura e aqui, o editor relê
+  // em vez de sobrescrever um avanço. A parada é intenção do operador: tenta de novo.
+  if (!(await casQueue(batchId, raw, novo))) {
+    return stopResearchQueue(batchId);
+  }
   await recordAudit(batchId, "RESEARCH_QUEUE_STOP", { posicao: state.posicao, total: state.rowNumbers.length }).catch(() => {});
   return { ok: true, estado: novo };
 }
 
 /** Retomada manual: processa as pendências sem repetir o que já produziu evidência válida. */
 export async function resumeResearchQueue(batchId: string): Promise<{ ok: boolean; error?: string; estado?: ResearchQueueState }> {
-  const state = await readQueue(batchId);
-  if (!state) return { ok: false, error: "Nenhuma fila de pesquisa neste lote." };
+  const { raw, state } = await readQueueRaw(batchId);
+  if (!state || raw === null) return { ok: false, error: "Nenhuma fila de pesquisa neste lote." };
   if (state.estado === "RODANDO") return { ok: true, estado: state };
   if (state.posicao >= state.rowNumbers.length) {
     const concluida: ResearchQueueState = { ...state, estado: "CONCLUIDA", heartbeat: new Date().toISOString() };
-    await writeQueue(batchId, concluida);
+    if (!(await casQueue(batchId, raw, concluida))) return resumeResearchQueue(batchId);
     return { ok: true, estado: concluida };
   }
-  const novo: ResearchQueueState = { ...state, estado: "RODANDO", motivoPausa: null, heartbeat: new Date().toISOString() };
-  await writeQueue(batchId, novo);
+  const novo: ResearchQueueState = { ...state, estado: "RODANDO", motivoPausa: null, heartbeat: new Date().toISOString(), dono: null };
+  if (!(await casQueue(batchId, raw, novo))) return resumeResearchQueue(batchId);
   await recordAudit(batchId, "RESEARCH_QUEUE_RESUME", { posicao: novo.posicao, total: novo.rowNumbers.length }).catch(() => {});
   if (!researchQueueRunners.has(batchId)) void runResearchQueue(batchId);
   return { ok: true, estado: novo };
 }
 
-/** Executor da fila: UMA conta por vez (controle de cota honesto), checando a fila entre contas. */
-async function runResearchQueue(batchId: string): Promise<void> {
+/** Executor da fila: UMA conta por vez (controle de cota honesto), checando a fila entre contas.
+ *  `claimed` é o estado que ESTE executor ganhou por CAS; sem ele, busca o claim.
+ *  `claimedRaw` é a string exata gravada no claim — sem ela, o CAS do claim corrente falha. */
+async function runResearchQueue(batchId: string, claimed?: ResearchQueueState, claimedRaw?: string): Promise<void> {
   researchQueueRunners.add(batchId);
+  let state = claimed ?? null;
+  // A string exata que ESTE executor gravou por último: é ela que o próximo CAS espera.
+  let owned = state ? (claimedRaw ?? serializeQueue(state)) : null;
+
+  // Heartbeat do dono: renova a posse sem mexer em posicao/contadores. Se outro assumiu
+  // (heartbeat velho + CAS alheio), o CAS falha e o executor para sem duplicar trabalho.
+  const beats = setInterval(() => {
+    if (!state || owned === null) return;
+    const snapshot = state;
+    const expected = owned;
+    const beatState: ResearchQueueState = { ...snapshot, heartbeat: new Date().toISOString() };
+    // Aborta se o estado local avançou (novo owned) OU o run já recomeçou sem posse.
+    const stillOwner = () => state === snapshot && owned === expected;
+    void casQueue(batchId, expected, beatState)
+      .then((ok) => {
+        if (!stillOwner()) return;
+        if (ok) {
+          // A batida virou a string atual do banco: o próximo CAS do laço espera por ela.
+          state = beatState;
+          owned = serializeQueue(beatState);
+          return;
+        }
+        // Falha sem avanço local significa que outro executor assumiu: este run encerra.
+        state = { ...snapshot, estado: "PARADA" } as ResearchQueueState;
+      })
+      .catch(() => {});
+  }, Q_OWNER_RENEW_MS);
+
   try {
     for (;;) {
-      const state = await readQueue(batchId);
-      if (!state || state.estado !== "RODANDO") break;
+      if (!state || owned === null) {
+        // Sem claim (chamada de iniciar/retomar em outro processo): tenta assumir.
+        const fresh = await readQueueRaw(batchId);
+        if (!fresh.state || fresh.raw === null) break;
+        if (!mayClaimQueue(fresh.state, QUEUE_EXECUTOR_ID, Date.now(), Q_HEARTBEAT_STALE_MS)) break;
+        const next: ResearchQueueState = { ...fresh.state, dono: QUEUE_EXECUTOR_ID, heartbeat: new Date().toISOString() };
+        if (!(await casQueue(batchId, fresh.raw, next))) continue; // perdeu a corrida — relê
+        state = next;
+        owned = serializeQueue(next);
+      }
+      if (state.estado !== "RODANDO") break;
+      if (state.dono !== QUEUE_EXECUTOR_ID) break; // lease de fila perdido (heartbeat ou CAS alheio)
+      // Relê entre contas: o operador pode ter ACRESCENTADO contas à fila viva
+      // (startResearchQueue) e o heartbeat pode ter avançado a string. Adota o que
+      // está no banco desde que a posse continue sendo deste executor.
+      {
+        const fresh = await readQueueRaw(batchId);
+        if (!fresh.state || fresh.raw === null) break;
+        if (fresh.state.dono !== QUEUE_EXECUTOR_ID) { state = null; owned = null; continue; }
+        if (fresh.raw !== owned) {
+          state = fresh.state;
+          owned = fresh.raw;
+        }
+      }
       if (state.posicao >= state.rowNumbers.length) {
-        await writeQueue(batchId, { ...state, estado: "CONCLUIDA", heartbeat: new Date().toISOString() });
-        await recordAudit(batchId, "RESEARCH_QUEUE_DONE", { concluidas: state.concluidas, puladas: state.puladas, falhas: state.falhas }).catch(() => {});
+        const done: ResearchQueueState = { ...state, estado: "CONCLUIDA", heartbeat: new Date().toISOString() };
+        if (!(await casQueue(batchId, owned, done))) {
+          // Alguém acrescentou contas ou gravou entre a releitura e aqui: relê e segue.
+          state = null;
+          owned = null;
+          continue;
+        }
+        state = done;
+        owned = serializeQueue(done);
+        await recordAudit(batchId, "RESEARCH_QUEUE_DONE", { concluidas: done.concluidas, puladas: done.puladas, falhas: done.falhas }).catch(() => {});
         break;
       }
       const rowNumber = state.rowNumbers[state.posicao];
       const row = await db.importRow.findFirst({ where: { batchId, rowNumber } });
-      const skip = (motivo: string) => {
+      const skip = async (motivo: string) => {
         void recordAudit(batchId, "RESEARCH_QUEUE_SKIP", { linha: rowNumber, motivo }, rowNumber).catch(() => {});
-        state.puladas += 1;
-        state.posicao += 1;
-        state.heartbeat = new Date().toISOString();
-        void writeQueue(batchId, state).catch(() => {});
+        const next: ResearchQueueState = {
+          ...state!,
+          puladas: state!.puladas + 1,
+          posicao: state!.posicao + 1,
+          heartbeat: new Date().toISOString(),
+        };
+        // CAS: se outro executor mexeu no estado entre a leitura e aqui, este run perde
+        // a posse e relê — a linha pulada fica para quem é dono agora.
+        if (await casQueue(batchId, owned, next)) {
+          state = next;
+          owned = serializeQueue(next);
+        } else {
+          state = null;
+          owned = null;
+        }
       };
-      if (!row) { skip("linha não existe mais"); continue; }
-      if (row.lookupStatus !== "ENRIQUECIDO") { skip("sem dados públicos prontos"); continue; }
-      if (packetFresco(row)) { skip("já tem dossiê fresco — nenhuma chamada repetida"); continue; }
-      if (deepLocks.has(row.id) || row.aiStatus === "EM_FILA" || row.aiStatus === "GERANDO") { skip("execução já em andamento"); continue; }
+      if (!row) { await skip("linha não existe mais"); continue; }
+      if (row.lookupStatus !== "ENRIQUECIDO") { await skip("sem dados públicos prontos"); continue; }
+      if (packetFresco(row)) { await skip("já tem dossiê fresco — nenhuma chamada repetida"); continue; }
+      if (deepLocks.has(row.id) || row.aiStatus === "EM_FILA" || row.aiStatus === "GERANDO") { await skip("execução já em andamento"); continue; }
 
       deepLocks.add(row.id);
       try {
@@ -1962,36 +2070,47 @@ async function runResearchQueue(batchId: string): Promise<void> {
           recusadasNaColeta = 0;
         }
       }
-      state.posicao += 1;
+      const base: ResearchQueueState = {
+        ...state,
+        posicao: state.posicao + 1,
+        heartbeat: new Date().toISOString(),
+      };
       if (after?.researchStatus === "FALHOU") {
-        state.falhas += 1;
+        base.falhas += 1;
         if (/429|too many|cota|limite/i.test(after.researchError ?? "")) {
           // contrato: 429/cota mantém estado honesto e exige retomada MANUAL
-          await writeQueue(batchId, {
-            ...state,
+          const pausada: ResearchQueueState = {
+            ...base,
             estado: "PAUSADA",
             motivoPausa: `Cota de pesquisa recusada pelo gateway (linha ${rowNumber}) — contas concluídas mantêm o dossiê. Retome manualmente quando a cota voltar.`,
-            heartbeat: new Date().toISOString(),
-          });
+          };
+          if (await casQueue(batchId, owned, pausada)) { state = pausada; owned = serializeQueue(pausada); }
           await recordAudit(batchId, "RESEARCH_QUEUE_PAUSED", { motivo: "cota_429", linha: rowNumber }, rowNumber).catch(() => {});
           break;
         }
       } else if (recusadasNaColeta > 0) {
-        await writeQueue(batchId, {
-          ...state,
+        const pausada: ResearchQueueState = {
+          ...base,
           estado: "PAUSADA",
           motivoPausa: `Cota de busca esgotada durante a coleta (linha ${rowNumber}: ${plural(recusadasNaColeta, "busca recusada", "buscas recusadas")}) — pacote salvo com PESQUISA INCOMPLETA (nunca conclusivo). Retome manualmente quando a cota voltar.`,
-          heartbeat: new Date().toISOString(),
-        });
+        };
+        if (await casQueue(batchId, owned, pausada)) { state = pausada; owned = serializeQueue(pausada); }
         await recordAudit(batchId, "RESEARCH_QUEUE_PAUSED", { motivo: "cota_parcial", linha: rowNumber, recusadas: recusadasNaColeta }, rowNumber).catch(() => {});
         break;
       } else if (after?.researchStatus === "OK") {
-        state.concluidas += 1;
+        base.concluidas += 1;
       }
-      state.heartbeat = new Date().toISOString();
-      await writeQueue(batchId, state);
+      if (await casQueue(batchId, owned, base)) {
+        state = base;
+        owned = serializeQueue(base);
+      } else {
+        // Outro executor assumiu durante a conta: ele é o dono agora. Encerra sem gravar.
+        state = null;
+        owned = null;
+      }
     }
   } finally {
+    clearInterval(beats);
     researchQueueRunners.delete(batchId);
   }
 }
@@ -2001,17 +2120,17 @@ async function runResearchQueue(batchId: string): Promise<void> {
 async function reviveStalledResearchQueues(): Promise<void> {
   const batches = await db.importBatch.findMany({
     where: { researchQueueJson: { not: null } },
-    select: { id: true, researchQueueJson: true },
+    // A decisão de retomar é do claimOrphanQueue (estado + dono + heartbeat velho, com
+    // CAS). Aqui só se pula quem JÁ tem executor neste processo.
+    select: { id: true },
     take: 50,
   });
   for (const b of batches) {
-    const q = parseQueue(b.researchQueueJson);
-    if (!q || q.estado !== "RODANDO") continue;
     if (researchQueueRunners.has(b.id)) continue;
-    const hb = new Date(q.heartbeat).getTime();
-    if (Number.isFinite(hb) && Date.now() - hb < Q_HEARTBEAT_STALE_MS) continue;
-    await recordAudit(b.id, "RESEARCH_QUEUE_REVIVE", { motivo: "heartbeat expirado (restart)" }).catch(() => {});
-    void runResearchQueue(b.id);
+    const claimed = await claimOrphanQueue(b.id);
+    if (!claimed) continue;
+    await recordAudit(b.id, "RESEARCH_QUEUE_REVIVE", { motivo: "heartbeat expirado (restart)", dono: QUEUE_EXECUTOR_ID }).catch(() => {});
+    void runResearchQueue(b.id, claimed.state, claimed.raw);
   }
 }
 
