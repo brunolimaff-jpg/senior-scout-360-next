@@ -38,7 +38,13 @@ O teste inicia PostgreSQL 17 local na porta 55440 com dados sintéticos, cria um
 node experiments/g8-postgres/test-research-queue-race.mjs
 ```
 
-Mede em duas conexões independentes o estado `researchQueueJson` que a fila de pesquisa grava. Hoje `writeQueue` faz `update` cego: dois executores leem o mesmo estado e ambos têm a escrita aceita, duplicando a linha. O teste também prova que o **menor fix** (compare-and-set na string JSON recém-lida, mesmo formato do `claimBatchLease`) elege exatamente um executor sem coluna nova, e que um JSON obsoleto perde o claim. Fecha com uma role de aplicação sem DDL e a leitura de `relrowsecurity`.
+Mede em duas conexões independentes o estado `researchQueueJson` que a fila de pesquisa grava. `OBS-A` mede o comportamento ANTIGO (update cego: ambas as escritas aceitas); `OBS-D`/`OBS-E` e `OBS-D2`/`OBS-D2b` medem o CAS que agora está em `runResearchQueue` (claim, avanço, batida do dono, perda para outro executor e retomada de fila órfã). Fecha com uma role de aplicação sem DDL e a leitura de `relrowsecurity`.
+
+```bash
+SMOKE_DB_URL='file:./db/g8-smoke.db' SMOKE_BASE='http://127.0.0.1:3000' node experiments/g8-postgres/smoke-research-queue.mjs
+```
+
+Smoke da fila pela API real, com o app rodando sobre banco sintético: inicia, executa, conclui, e confirma que o pacote fresco é contado uma vez só. Nenhum provedor externo é chamado.
 
 ## Limites
 

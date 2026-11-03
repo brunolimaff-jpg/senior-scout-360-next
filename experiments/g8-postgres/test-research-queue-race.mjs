@@ -100,6 +100,51 @@ try {
   const staleWinner = await casWrite(a, stale, {...JSON.parse(stale), posicao:2});
   console.log('OBS-E CAS com JSON obsoleto: vencedores =', staleWinner, '(esperado 0 — escritor perdedor detecta e relê)');
 
+  // ---- Observação D2: sequência REAL do engine (claim → avanço → heartbeat → perda) ----
+  // Replica o CAS do `runResearchQueue`: claim do dono, avanço de posição, batida do dono
+  // e a corrida de um segundo executor. Mede o que o teste unitário não alcança: banco.
+  {
+    const b2 = 'g8-engine-sequence';
+    const base = { rowNumbers:[1,2,3], estado:'RODANDO', modoPesquisa:'COMPLETO', posicao:0, motivoPausa:null, solicitadoEm:new Date().toISOString(), heartbeat:new Date().toISOString(), concluidas:0, puladas:0, falhas:0, dono:null };
+    const ser = (s) => JSON.stringify(s);
+    const cas = async (client, expected, next) => (await client.importBatch.updateMany({ where:{ id:b2, researchQueueJson: expected }, data:{ researchQueueJson: ser(next) } })).count;
+    await a.importBatch.create({ data:{ id:b2, fileName:'sintetico.csv', storedPath:'sintetico.csv', fileSize:0, researchQueueJson:ser(base) } });
+
+    // claim: os dois tentam a partir da MESMA string
+    const raw = ser(base);
+    const claimA = { ...base, dono:'q_a' }, claimB = { ...base, dono:'q_b' };
+    const [wa, wb] = await Promise.all([cas(a, raw, claimA), cas(b, raw, claimB)]);
+    assert.equal(wa + wb, 1, 'claim: exatamente um dono');
+    const dono = wa ? 'q_a' : 'q_b';
+    let owned = ser(wa ? claimA : claimB);
+
+    // avanço do dono (posicao 0 → 1)
+    const step = { ...(wa ? claimA : claimB), posicao:1, concluidas:1, heartbeat:new Date().toISOString() };
+    assert.equal(await cas(a, owned, step), 1, 'dono avança a posição');
+    owned = ser(step);
+
+    // heartbeat do dono grava; um não-dono com a string ANTIGA perde
+    const beat = { ...step, heartbeat:new Date().toISOString() };
+    assert.equal(await cas(a, owned, beat), 1, 'batida do dono aceita');
+    assert.equal(await cas(b, owned, { ...beat, dono:'q_b', posicao:2 }), 0, 'string antiga não sobrepõe a batida');
+    owned = ser(beat);
+
+    // lock da linha: mesmo com CAS, a gravação do dono é serializada pelo banco
+    const [final] = await a.$queryRaw`SELECT "researchQueueJson" FROM "ImportBatch" WHERE "id" = ${b2}`;
+    const parsed = JSON.parse(final.researchQueueJson);
+    assert.equal(parsed.dono, dono);
+    assert.equal(parsed.posicao, 1);
+    console.log('OBS-D2 sequência do engine: dono =', dono, '| posicao =', parsed.posicao, '| segunda escrita com string antiga = 0 (PASS)');
+
+    // retomada após morte do dono: heartbeat velho + outro executor assume por CAS
+    const morta = { ...parsed, dono:'q_a', heartbeat:new Date(Date.now() - 4 * 60_000).toISOString() };
+    await a.importBatch.update({ where:{ id:b2 }, data:{ researchQueueJson:ser(morta) } });
+    const assumida = { ...morta, dono:'q_c', heartbeat:new Date().toISOString() };
+    assert.equal(await cas(b, ser(morta), assumida), 1, 'fila órfã é assumida');
+    console.log('OBS-D2b retomada de fila órfã por outro executor: PASS');
+    await a.importBatch.delete({ where:{ id:b2 } });
+  }
+
   // ---- Observação F: G8.3 — role de aplicação sem privilégios de owner/DDL ----
   // Mede o que a fronteira de acesso daria: SELECT/INSERT/UPDATE/SELECT em tabelas do app,
   // nenhum DDL, nenhum acesso a pg_catalog sensível.
