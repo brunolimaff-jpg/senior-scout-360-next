@@ -33,6 +33,19 @@ try {
   const date=new Date('2026-01-01T12:34:56.000Z');
   await a.importRow.create({data:{id:'g8-native-row',batchId:batch,rowNumber:1,updatedAt:date}});
   assert.equal((await a.importRow.findUniqueOrThrow({where:{id:'g8-native-row'}})).updatedAt.toISOString(),date.toISOString());
+  for (const zone of ['UTC', 'America/Sao_Paulo', 'Asia/Tokyo']) {
+    await a.$transaction(async tx => {
+      await tx.$executeRawUnsafe(`SET LOCAL TIME ZONE '${zone}'`);
+      const row = await tx.importRow.findUniqueOrThrow({where:{id:'g8-native-row'}});
+      assert.equal(row.updatedAt.toISOString(), date.toISOString(), `data em ${zone}`);
+      await tx.importBatch.update({where:{id:batch},data:{leaseExpiresAt:date}});
+      const expired = await tx.importBatch.count({where:{id:batch,leaseExpiresAt:{lt:new Date('2026-01-01T12:34:57.000Z')}}});
+      const alive = await tx.importBatch.count({where:{id:batch,leaseExpiresAt:{lt:new Date('2026-01-01T12:34:55.000Z')}}});
+      assert.equal(expired, 1, `lease expirado em ${zone}`);
+      assert.equal(alive, 0, `lease vivo em ${zone}`);
+    });
+  }
+  await a.importBatch.update({where:{id:batch},data:{leaseExpiresAt:null}});
   assert.equal(JSON.parse((await a.importBatch.findUniqueOrThrow({where:{id:batch}})).researchQueueJson).estado,'PAUSADA');
   await assert.rejects(a.importRow.create({data:{id:'g8-orphan',batchId:'absent',rowNumber:2}}));
   await assert.rejects(a.$transaction(async t=>{await t.importBatch.update({where:{id:batch},data:{fileName:'rollback.csv'}});throw new Error('rollback');}));
@@ -42,6 +55,33 @@ try {
   let n=0; const sql=raw.replace(/\$\{batchId\}/g,()=>`$${++n}`);
   assert.equal(Number((await a.$queryRawUnsafe(sql,...Array(n).fill(batch)))[0].row_count),1);
   const lease=async(client,owner)=>client.importBatch.updateMany({where:{id:batch,OR:[{leaseExpiresAt:null},{leaseExpiresAt:{lt:new Date()}}]},data:{leaseOwner:owner,leaseExpiresAt:new Date(Date.now()+60000)}});
+  const observer=new PrismaClient({datasources:{db:{url}}}); clients.push(observer);
+  let locked, release;
+  const lockedSignal=new Promise(resolve=>{locked=resolve;});
+  const releaseSignal=new Promise(resolve=>{release=resolve;});
+  const holding=a.$transaction(async tx=>{
+    await tx.$queryRaw`SELECT "id" FROM "ImportBatch" WHERE "id" = ${batch} FOR UPDATE`;
+    locked();
+    await releaseSignal;
+    return lease(tx,'lock-owner');
+  },{timeout:15000});
+  await lockedSignal;
+  const waiting=lease(b,'waiting-worker');
+  try {
+    let blocked=false;
+    for(let i=0;i<100;i++) {
+      const [state]=await observer.$queryRaw`SELECT cardinality(pg_blocking_pids(${ids[1][0].pid}::int))::int AS blocked`;
+      if(state.blocked>0) {blocked=true;break;}
+      await new Promise(resolve=>setTimeout(resolve,50));
+    }
+    assert.equal(blocked,true,'segunda conexão bloqueada pelo lock da primeira');
+  } finally {
+    release();
+  }
+  const [heldResult,waitingResult]=await Promise.all([holding,waiting]);
+  assert.equal(heldResult.count,1,'detentor do lock conquista o lease');
+  assert.equal(waitingResult.count,0,'concorrente bloqueado não conquista o lease');
+  await a.importBatch.update({where:{id:batch},data:{leaseOwner:null,leaseExpiresAt:null}});
   const results=await Promise.all([lease(a,'worker-a'),lease(b,'worker-b')]);
   assert.equal(results[0].count+results[1].count,1,'apenas um claim');
   const winner=results[0].count?'worker-a':'worker-b', loser=winner==='worker-a'?'worker-b':'worker-a';
@@ -51,7 +91,7 @@ try {
   assert.equal((await lease(b,loser)).count,1);
   assert.equal((await a.importBatch.updateMany({where:{id:batch,leaseOwner:winner},data:{leaseExpiresAt:new Date(Date.now()+60000)}})).count,0);
   await a.importBatch.delete({where:{id:batch}}); assert.equal(await a.importRow.count(),0);
-  console.log('PASS: PostgreSQL 17 local; replay migration; Prisma CRUD/FK/UTC/JSON/rollback/SQL/cascata; duas conexões independentes: claim exclusivo, heartbeat e retomada após expiração.');
+  console.log('PASS: PostgreSQL 17 local; replay migration; Prisma CRUD/FK/UTC/JSON/rollback/SQL/cascata; datas e lease em UTC, São Paulo e Tóquio; bloqueio observado, claim exclusivo, heartbeat e retomada.');
   console.log('LIMITES: apenas o contrato do lease foi testado; execução integral, cancelamento de tarefas e fila de pesquisa não foram testados. Cluster sintético:',directory);
 } finally {
   await Promise.all(clients.map(c=>c.$disconnect()));
