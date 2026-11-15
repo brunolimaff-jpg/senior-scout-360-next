@@ -1773,6 +1773,9 @@ const researchQueueRunners = qg.__scoutResearchQueues;
  * e, se outro assume, o executor antigo percebe e para sem duplicar trabalho.
  */
 const Q_OWNER_RENEW_MS = 30_000; // renovação do dono (Q_HEARTBEAT_STALE_MS = 4 perdas)
+/** Espera máxima por uma conta em execução em outro executor antes de pausar a fila. */
+const Q_INFLIGHT_WAIT_MS = 5 * 60_000;
+const Q_INFLIGHT_POLL_MS = 2_000;
 
 const go = globalThis as unknown as { __scoutQueueExecId?: string };
 go.__scoutQueueExecId ??= `q_${process.pid}_${Math.random().toString(36).slice(2, 8)}`;
@@ -1813,6 +1816,39 @@ async function claimOrphanQueue(
   const next: ResearchQueueState = { ...state, dono: QUEUE_EXECUTOR_ID, heartbeat: new Date().toISOString() };
   const nextRaw = serializeQueue(next);
   return (await casQueue(batchId, raw, next)) ? { state: next, raw: nextRaw } : null;
+}
+
+function iaResultadoDaTentativa(row: { researchStatus: string | null; aiStatus: string | null; researchAt: Date | null; aiProcessedAt: Date | null }): boolean {
+  // Resultado TERMINAL desta tentativa: a síntese terminou depois do pacote atual
+  // (ou a pesquisa falhou). Um aiStatus OK antigo (aiProcessedAt < researchAt) não vale.
+  if (row.researchStatus === "FALHOU") return true;
+  if (row.aiStatus !== "OK" && row.aiStatus !== "FALHOU") return false;
+  if (!row.researchAt || !row.aiProcessedAt) return false;
+  return new Date(row.aiProcessedAt).getTime() >= new Date(row.researchAt).getTime();
+}
+
+/**
+ * Espera a conta sair de "em execução" (researchStatus=GERANDO ou aiStatus=EM_FILA/GERANDO),
+ * OU de pacote OK sem resultado terminal da tentativa, para o novo dono contabilizar o
+ * resultado persistido pelo executor anterior — em vez de pular/fechar antes do fim.
+ */
+async function waitForInFlightRow(rowId: string): Promise<"finished" | "timeout"> {
+  const t0 = Date.now();
+  for (;;) {
+    const r = await db.importRow.findUnique({
+      where: { id: rowId },
+      select: { researchStatus: true, aiStatus: true, researchAt: true, aiProcessedAt: true },
+    });
+    const busy = !!r && (
+      r.researchStatus === "GERANDO" ||
+      r.aiStatus === "EM_FILA" ||
+      r.aiStatus === "GERANDO" ||
+      (r.researchStatus === "OK" && !iaResultadoDaTentativa(r))
+    );
+    if (!busy) return "finished";
+    if (Date.now() - t0 >= Q_INFLIGHT_WAIT_MS) return "timeout";
+    await new Promise((res) => setTimeout(res, Q_INFLIGHT_POLL_MS));
+  }
 }
 
 /** Pacote salvo é fresco (<24 h), completo e sem recusa de cota → a fila PULA sem novas chamadas. */
@@ -2023,19 +2059,28 @@ async function runResearchQueue(batchId: string, claimed?: ResearchQueueState, c
       }
       const rowNumber = state.rowNumbers[state.posicao];
       const row = await db.importRow.findFirst({ where: { batchId, rowNumber } });
-      const skip = async (motivo: string) => {
-        void recordAudit(batchId, "RESEARCH_QUEUE_SKIP", { linha: rowNumber, motivo }, rowNumber).catch(() => {});
+      const skip = async (motivo: string, kind: "pulada" | "concluida" | "falha" = "pulada") => {
         const next: ResearchQueueState = {
           ...state!,
-          puladas: state!.puladas + 1,
+          ...(kind === "concluida"
+            ? { concluidas: state!.concluidas + 1 }
+            : kind === "falha"
+              ? { falhas: state!.falhas + 1 }
+              : { puladas: state!.puladas + 1 }),
           posicao: state!.posicao + 1,
           heartbeat: new Date().toISOString(),
         };
-        // CAS: se outro executor mexeu no estado entre a leitura e aqui, este run perde
-        // a posse e relê — a linha pulada fica para quem é dono agora.
+        // Auditabilidade: o evento só existe DEPOIS do CAS vencedor. Em CAS=0 não houve
+        // atualização — registrar ADOPT/SKIP ali criaria evento sem efeito correspondente.
         if (await casQueue(batchId, owned, next)) {
           state = next;
           owned = serializeQueue(next);
+          await recordAudit(
+            batchId,
+            kind === "concluida" ? "RESEARCH_QUEUE_ADOPT" : kind === "falha" ? "RESEARCH_QUEUE_ADOPT_FAILED" : "RESEARCH_QUEUE_SKIP",
+            { linha: rowNumber, motivo },
+            rowNumber
+          ).catch(() => {});
         } else {
           state = null;
           owned = null;
@@ -2043,8 +2088,62 @@ async function runResearchQueue(batchId: string, claimed?: ResearchQueueState, c
       };
       if (!row) { await skip("linha não existe mais"); continue; }
       if (row.lookupStatus !== "ENRIQUECIDO") { await skip("sem dados públicos prontos"); continue; }
-      if (packetFresco(row)) { await skip("já tem dossiê fresco — nenhuma chamada repetida"); continue; }
-      if (deepLocks.has(row.id) || row.aiStatus === "EM_FILA" || row.aiStatus === "GERANDO") { await skip("execução já em andamento"); continue; }
+      if (packetFresco(row) && iaResultadoDaTentativa(row)) {
+        // Resultado TERMINAL desta tentativa. Síntese falha não é conta concluída.
+        if (row.aiStatus === "FALHOU") {
+          await skip("dossiê salvo com síntese falha — contabilizada como falha", "falha");
+          continue;
+        }
+        // Dossiê persistido DEPOIS do pedido desta fila é resultado desta fila (ex.: executor
+        // anterior perdeu a posse), não "conta preexistente pulada".
+        const produzidoNaFila =
+          !!row.researchAt && !!state!.solicitadoEm
+            ? new Date(row.researchAt).getTime() >= new Date(state!.solicitadoEm).getTime()
+            : false;
+        await skip("já tem dossiê fresco — nenhuma chamada repetida", produzidoNaFila ? "concluida" : "pulada");
+        continue;
+      }
+      if (
+        deepLocks.has(row.id) ||
+        row.aiStatus === "EM_FILA" ||
+        row.aiStatus === "GERANDO" ||
+        row.researchStatus === "GERANDO" ||
+        (packetFresco(row) && !iaResultadoDaTentativa(row))
+      ) {
+        // Outro executor está com a conta: espera o resultado persistido e contabiliza.
+        // Pular e avançar aqui fechava a fila com puladas>0/concluidas=0 antes do fim.
+        const waited = await waitForInFlightRow(row.id);
+        if (waited === "timeout") {
+          const pausada: ResearchQueueState = {
+            ...state!,
+            estado: "PAUSADA",
+            motivoPausa: `Conta ${rowNumber} em execução em outro executor há mais de 5 min — a fila não foi fechada; retome após o término.`,
+            heartbeat: new Date().toISOString(),
+          };
+          if (await casQueue(batchId, owned, pausada)) {
+            state = pausada;
+            owned = serializeQueue(pausada);
+            // Evento só depois da pausa gravada (CAS vencedor).
+            await recordAudit(batchId, "RESEARCH_QUEUE_PAUSED", { motivo: "conta_em_voo", linha: rowNumber }, rowNumber).catch(() => {});
+          }
+          break;
+        }
+        const finalRow = await db.importRow.findUnique({ where: { id: row.id }, select: { researchStatus: true, aiStatus: true, researchAt: true, aiProcessedAt: true } });
+        if (
+          finalRow?.researchStatus === "OK" &&
+          finalRow.aiStatus === "OK" &&
+          !!finalRow.researchAt &&
+          !!finalRow.aiProcessedAt &&
+          new Date(finalRow.aiProcessedAt).getTime() >= new Date(finalRow.researchAt).getTime()
+        ) {
+          await skip("conta concluída por outro executor — resultado contabilizado", "concluida");
+          continue;
+        }
+        // Resultado persistido sem sucesso (pesquisa ou síntese falhou): conta como falha.
+        // A política de pausa para esse caso fica como decisão de produto (não implementada aqui).
+        await skip("conta terminou em outro executor sem dossiê OK — contabilizada como falha", "falha");
+        continue;
+      }
 
       deepLocks.add(row.id);
       try {
@@ -2057,7 +2156,7 @@ async function runResearchQueue(batchId: string, claimed?: ResearchQueueState, c
 
       const after = await db.importRow.findFirst({
         where: { batchId, rowNumber },
-        select: { researchStatus: true, researchError: true, researchJson: true },
+        select: { researchStatus: true, aiStatus: true, researchError: true, researchJson: true },
       });
       // coleta com recusa de cota também é LIMITE ATINGIDO (contrato): o pacote salva
       // honesto (OK + buscasRecusadasCota>0) mas a fila NÃO segue adiante procurando
@@ -2097,6 +2196,9 @@ async function runResearchQueue(batchId: string, claimed?: ResearchQueueState, c
         if (await casQueue(batchId, owned, pausada)) { state = pausada; owned = serializeQueue(pausada); }
         await recordAudit(batchId, "RESEARCH_QUEUE_PAUSED", { motivo: "cota_parcial", linha: rowNumber, recusadas: recusadasNaColeta }, rowNumber).catch(() => {});
         break;
+      } else if (after?.aiStatus === "FALHOU") {
+        // Pacote OK + síntese FALHOU: resultado persistido é falha, nunca concluída.
+        base.falhas += 1;
       } else if (after?.researchStatus === "OK") {
         base.concluidas += 1;
       }
@@ -2276,6 +2378,11 @@ async function runDeepResearchInner(batchId: string, rowId: string, modo: ModoPe
       researchStatus: "OK",
       researchAt: new Date(),
       researchError: null,
+      // Janela pacote→síntese (Planejador): o pacote OK e o marcador de síntese em voo
+      // são gravados na MESMA update. Um segundo executor nunca vê pacote fresco com
+      // aiStatus terminal antigo e conta concluída antes da síntese desta tentativa.
+      aiStatus: "GERANDO",
+      aiError: null,
     },
   });
   await recordAudit(batchId, "DEEP_RESEARCH_PACKET", {
