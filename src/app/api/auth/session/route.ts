@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { okRes, errRes, fail500 } from "@/lib/api";
-import { authMode, clearSessionCookie, currentSecret, hasValidSession, tryIssueSession } from "@/lib/auth";
+import { authConfigError, authMode, clearSessionCookie, currentSecret, isAuthorized, tryIssueSession } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,14 +8,17 @@ export const dynamic = "force-dynamic";
 /**
  * GET /api/auth/session — estado do acesso (NUNCA devolve o segredo).
  * A UI usa isso para mostrar "acesso local aberto" ou pedir desbloqueio.
+ * Em produção sem SCOUT_EXPORT_TOKEN, configError explica o 503 das rotas.
  */
 export async function GET(req: NextRequest) {
   try {
     const mode = authMode();
     const secret = await currentSecret();
+    const configError = authConfigError();
     return okRes({
       authMode: mode,
-      authenticated: mode === "TOKEN" ? hasValidSession(req, secret) || providedHeader(req, secret) : true,
+      configError,
+      authenticated: mode === "TOKEN" ? isAuthorized(req, secret) : configError === null,
     });
   } catch (err) {
     return fail500(err);
@@ -49,10 +52,4 @@ export async function DELETE() {
     status: 200,
     headers: { "Content-Type": "application/json", "Set-Cookie": clearSessionCookie(), "Cache-Control": "no-store" },
   });
-}
-
-function providedHeader(req: NextRequest, secret: string | null): boolean {
-  if (!secret) return false;
-  const provided = (req.headers.get("x-export-token") ?? "").trim();
-  return provided.length > 0 && provided.length === secret.length;
 }
