@@ -36,6 +36,7 @@ db/*.db-journal
 db/*.db-wal
 prisma/db/
 db/*.db-shm
+db/.scout-token
 db/backup/
 db/backups/
 

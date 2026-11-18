@@ -17,7 +17,8 @@
  *     - SCOUT_AUTH_REQUIRED=1 sem token ........ modo TOKEN com segredo AUTO-GERADO e
  *       persistido em db/.scout-token (deploy não fica aberto por esquecimento)
  *     - nenhum dos dois ........................ modo OPEN (kit local) — estado visível
- *       em GET /api/auth/session e na UI; NUNCA silencioso em produção.
+ *       em GET /api/auth/session e na UI; em produção, OPEN vira 503 AUTH_MISCONFIG
+ *       (fail-closed) em toda rota de dados.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
@@ -56,6 +57,19 @@ export function authMode(): AuthMode {
   if (explicit) return "TOKEN";
   if ((process.env.SCOUT_AUTH_REQUIRED ?? "").trim() === "1") return "TOKEN";
   return "OPEN";
+}
+
+/**
+ * Configuração de autenticação inválida para o ambiente? (P0 fail-closed)
+ *
+ * Em produção, o modo OPEN significa que nenhum segredo foi configurado: as
+ * rotas de dados devem recusar em vez de abrir. Fora de produção o OPEN é o
+ * "kit local" documentado e continua válido.
+ */
+export function authConfigError(): string | null {
+  if (process.env.NODE_ENV !== "production") return null;
+  if (authMode() !== "OPEN") return null;
+  return "Autenticação não configurada neste ambiente: defina SCOUT_EXPORT_TOKEN (segredo do servidor) e reinicie o serviço. Enquanto isso, as rotas de dados respondem 503.";
 }
 
 function sign(value: string, secret: string): string {
@@ -102,7 +116,19 @@ export function isAuthorized(req: NextRequest, secret: string | null): boolean {
  *   if (denied) return denied;
  */
 export async function assertAccess(req: NextRequest): Promise<NextResponse | null> {
-  if (authMode() === "OPEN") return null;
+  if (authMode() === "OPEN") {
+    const configError = authConfigError();
+    if (configError) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: { code: "AUTH_MISCONFIG", message: configError },
+        },
+        { status: 503, headers: { "Cache-Control": "no-store" } }
+      );
+    }
+    return null;
+  }
   const secret = (process.env.SCOUT_EXPORT_TOKEN ?? "").trim() || (await ensureAutoToken());
   if (isAuthorized(req, secret)) return null;
   return NextResponse.json(

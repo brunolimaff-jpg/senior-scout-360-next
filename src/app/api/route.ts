@@ -7,7 +7,7 @@
  */
 import { NextResponse } from "next/server";
 import { appVersion } from "@/lib/version";
-import { authMode } from "@/lib/auth";
+import { authConfigError, authMode } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,6 +19,7 @@ export async function GET() {
       servico: "Scout 360",
       versao: appVersion(),
       modoAcesso: authMode(),
+      configError: authConfigError(),
     },
     { headers: { "Cache-Control": "no-store" } }
   );
