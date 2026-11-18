@@ -271,6 +271,8 @@ export interface BatchDetail {
   totalPending: number;
   totalConfirmed: number;
   totalReview: number;
+  /** v0.11.4: contas com cadastro enriquecido e SEM revisão de identidade pendente (população do escopo "sem revisão" da exportação) — nunca calculada por subtração. */
+  prontasSemRevisao: number;
   totalUnresolved: number;
   /** v0.10.12: estágio de confiança da identidade */
   totalLocalizado: number;
