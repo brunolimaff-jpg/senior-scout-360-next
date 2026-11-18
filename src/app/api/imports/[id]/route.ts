@@ -1,9 +1,10 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
+import { db, revisaoFatos } from "@/lib/db";
 import { okRes, errRes, fail500 } from "@/lib/api";
 import { isBatchLocked, recordAudit, sweepStalled, recomputeCounters, batchHasLiveLease, getResearchQueue, isResearchQueueRunning, parseStoredFile } from "@/lib/enrich/engine";
 import { assertAccess } from "@/lib/auth";
 import { setorDeCnae } from "@/lib/enrich/segmentos";
+import { SEM_BLOQUEIO_IDENTIDADE, DOSSIE_PRONTO_WHERE, CONFIRMADA_WHERE, whereResolucao, mergeWhere } from "@/lib/lotes/populacoes";
 import type { ResearchPacketView } from "@/lib/types";
 import type { FontesProveniencia } from "@/lib/enrich/cadastro-cache";
 
@@ -30,59 +31,14 @@ const RESEARCH_FILTERS: Record<string, string[] | null> = {
   sem_pesquisa: null, // researchStatus nunca pedido (null) —_where especial_
 };
 
-/** v0.11.3 (missão Lotes+Mesa): MESMA definição canônica de “sem bloqueio de
- * identidade” usada pelo contador totalReview (engine.recomputeCounters) e pelo
- * conjunto “Identificadas” da tabela — decisão humana pendente (REVIEW) ou registro
- * localizado divergente (LOCALIZADO com ficha coletada) BLOQUEIAM o dossiê na Mesa.
- * A conta continua visível em Lotes (pendente de revisão) — nunca desaparece. */
-const SEM_BLOQUEIO_IDENTIDADE = [
-  { OR: [{ resolutionState: null }, { resolutionState: { not: "REVIEW" } }] },
-  { OR: [{ identityStage: null }, { identityStage: { not: "LOCALIZADO" } }] },
-];
-
-/** v0.11.3: filtro canônico do filtro rápido “Dossiês” da Mesa — pesquisa solicitada
- * e CONCLUÍDA (researchStatus OK), síntese concluída (aiStatus OK), cadastro coletado
- * e identidade sem bloqueio. É a MESMA população do contador pesquisaProfunda.dossiesProntos:
- * o número do botão e a tabela filtrada contam exatamente o mesmo conjunto. */
-const DOSSIE_PRONTO_WHERE = {
-  researchStatus: "OK",
-  aiStatus: "OK",
-  lookupStatus: "ENRIQUECIDO",
-  AND: SEM_BLOQUEIO_IDENTIDADE,
-};
+// v0.11.4: memo por processo da última reconciliação de contadores (ver GET abaixo).
+// Runtime single-process SQLite — a chave é o id do lote; cada processo tem o seu mapa.
+const globalForCounters = globalThis as unknown as { __scoutCountersRev?: Map<string, number> };
 
 const RESOLUTION_FILTERS: Record<string, string> = {
   CONFIRMED: "CONFIRMED",
   REVIEW: "REVIEW",
   UNRESOLVED: "UNRESOLVED",
-};
-
-// v0.10.12: "Revisar" inclui registro LOCALIZADO (divergência de identidade);
-// "Identificadas" exclui divergentes (não são identificadas até revisar/validar) e
-// INCLUDE linhas de CNPJ direto enriquecidas (resolutionState null — o rótulo novo
-// do filtro é "Identificadas", não mais "resolução CONFIRMED").
-const whereResolucao = (filtro: string): Record<string, unknown> | null => {
-  // v0.11.2 (UX): "Revisar" alinhado ao contador do engine (totalReview, engine.ts):
-  // REVIEW OU LOCALIZADO COM ficha coletada. Antes o filtro incluía LOCALIZADO sem
-  // coleta (em processamento) — clicar em "Revisar agora" mostrava mais linhas do
-  // que a contagem do chip, e a mensagem parecia contradizer os filtros rápidos.
-  if (filtro === "REVIEW") return { OR: [{ resolutionState: "REVIEW" }, { identityStage: "LOCALIZADO", lookupStatus: "ENRIQUECIDO" }] };
-  if (filtro === "CONFIRMED") {
-    return {
-      identityStage: { not: "LOCALIZADO" },
-      OR: [{ resolutionState: "CONFIRMED" }, { resolutionState: null, lookupStatus: "ENRIQUECIDO" }],
-    };
-  }
-  if (filtro === "UNRESOLVED") {
-    // v0.11.0 (homologação Gate 2): o `not` do Prisma EXCLUI nulos — toda linha
-    // UNRESOLVED de pipeline tem identityStage NULL e o filtro devolvia 0 mesmo com
-    // linhas "Não encontrada" no lote (contadores e filtro divergiam). NULL participa.
-    return {
-      resolutionState: "UNRESOLVED",
-      OR: [{ identityStage: null }, { identityStage: { not: "LOCALIZADO" } }],
-    };
-  }
-  return null;
 };
 
 /**
@@ -98,12 +54,23 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     if (denied) return denied;
     const { id } = await ctx.params;
     await sweepStalled(); // recuperação idempotente a cada consulta AUTORIZADA
-    // auto-cura dos contadores (idempotente, barato no SQLite): mantém a UI sempre
-    // coerente com as linhas reais, mesmo após reinícios/falhas no meio do processamento
+    // auto-cura dos contadores (idempotente): mantém a UI sempre coerente com as
+    // linhas reais, mesmo após reinícios/falhas no meio do processamento — desde a
+    // v0.11.4 só roda quando os fatos mudaram (ver gate abaixo).
     const exists = await db.importBatch.findUnique({ where: { id }, select: { status: true } });
     if (!exists) return errRes("NOT_FOUND", "Lote não encontrado.", 404);
     if (exists.status !== "PREVIEW") {
-      await recomputeCounters(id);
+      // v0.11.4: auto-cura PRESERVADA, mas só quando os fatos mudaram desde a última
+      // reconciliação — polling ocioso não escreve mais (a leitura do lote era a maior
+      // fonte de writes no banco). Engine/decide/escrevem → revisaoFatos() sobe → a
+      // próxima leitura reconcilia UMA vez. Runtime single-process SQLite; após restart
+      // do processo a primeira leitura recalcula (idempotente).
+      const rev = revisaoFatos();
+      const revMemo = (globalForCounters.__scoutCountersRev ??= new Map<string, number>());
+      if (revMemo.get(id) !== rev) {
+        await recomputeCounters(id);
+        revMemo.set(id, revisaoFatos()); // snapshot DEPOIS: o UPDATE do recompute sobe a revisão
+      }
     }
 
     const batch = await db.importBatch.findUnique({ where: { id } });
@@ -132,7 +99,8 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     }
     if (resolucaoFilter in RESOLUTION_FILTERS) {
       const wr = whereResolucao(resolucaoFilter);
-      if (wr) Object.assign(where, wr);
+      // v0.11.4: mergeWhere preserva AND/OR de outros filtros (Object.assign pisava chaves).
+      if (wr) mergeWhere(where, wr);
     }
     if (pesquisaFilter in RESEARCH_FILTERS) {
       const statuses = RESEARCH_FILTERS[pesquisaFilter];
@@ -140,8 +108,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
       else where.researchStatus = null; // sem_pesquisa: nunca pedido
     } else if (pesquisaFilter === "dossie_pronto") {
       // v0.11.3 (missão Lotes+Mesa): população da Mesa — composta (pesquisa+síntese+
-      // identidade), não apenas researchStatus. where.AND não conflita com where.OR da busca q.
-      Object.assign(where, DOSSIE_PRONTO_WHERE);
+      // identidade), não apenas researchStatus.
+      // v0.11.4: mergeWhere concatena o AND (o OR da busca q continua válido ao lado).
+      mergeWhere(where, DOSSIE_PRONTO_WHERE);
     }
     if (q) {
       const digits = q.replace(/\D+/g, "");
@@ -154,10 +123,13 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
         orConditions.push({ normalizedCnpj: { contains: digits } });
         orConditions.push({ resolvedCnpj: { contains: digits } });
       }
-      where.OR = orConditions;
+      // v0.11.4: a busca entra como item do AND — NÃO sobrescreve o OR do filtro de
+      // resolução. Antes `where.OR = ...` apagava o filtro ativo e a tabela mostrava
+      // linhas fora do conjunto selecionado. Composto, filtro + busca se compõem.
+      mergeWhere(where, { OR: orConditions });
     }
 
-    const [totalFiltered, rows, events, totalMatriz, totalDirectCnpj, alertBaixada, alertMatriz, alertHumana, sectorAgg, ufAgg, situAgg, pjRaizesIdentificadas, pjRaizesLocalizadas, matrizRaizes, cnaeRows, totalFalhasConsulta, totalFila, ppSolicitadas, ppConcluidas, ppEmExecucao, ppSintetizando, ppFalhas, ppDossiesProntos, ppElegiveis] = await Promise.all([
+    const [totalFiltered, rows, events, totalMatriz, totalDirectCnpj, alertBaixada, alertMatriz, alertHumana, sectorAgg, ufAgg, situAgg, pjRaizesIdentificadas, pjRaizesLocalizadas, matrizRaizes, cnaeRows, totalFalhasConsulta, totalFila, ppSolicitadas, ppConcluidas, ppEmExecucao, ppSintetizando, ppFalhas, ppDossiesProntos, ppElegiveis, prontasSemRevisao] = await Promise.all([
       db.importRow.count({ where }),
       db.importRow.findMany({
         where,
@@ -218,15 +190,12 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
       // como Identificada (ficha coletada, sem divergência de identidade pendente);
       // "localizadas" = toda raiz com ficha coletada, incluindo as 6+ em revisão.
       // O resumo passa a distinguir os dois números em vez de chamar tudo de identificado.
+      // v0.11.4: MESMA população do filtro "Identificadas" e do contador prontasSemRevisao
+      // (CONFIRMADA_WHERE) — raízes de CNPJ direto (identidade/resolução NULL) passam a
+      // contar; antes o `not` do Prisma as excluía por serem NULL.
       db.importRow.groupBy({
         by: ["cnpjRoot"],
-        where: {
-          batchId: id,
-          lookupStatus: "ENRIQUECIDO",
-          cnpjRoot: { not: null },
-          identityStage: { not: "LOCALIZADO" },
-          OR: [{ resolutionState: null }, { resolutionState: "CONFIRMED" }],
-        },
+        where: { batchId: id, cnpjRoot: { not: null }, ...CONFIRMADA_WHERE },
       }),
       db.importRow.groupBy({
         by: ["cnpjRoot"],
@@ -262,6 +231,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
       db.importRow.count({ where: { batchId: id, OR: [{ researchStatus: "FALHOU" }, { researchStatus: "OK", aiStatus: "FALHOU" }] } }),
       db.importRow.count({ where: { batchId: id, ...DOSSIE_PRONTO_WHERE } }),
       db.importRow.count({ where: { batchId: id, lookupStatus: "ENRIQUECIDO", AND: SEM_BLOQUEIO_IDENTIDADE } }),
+      // v0.11.4: população do escopo "sem revisão" da exportação (CONFIRMADA_WHERE) —
+      // contador próprio; a UI parou de calcular isso por subtração de conjuntos ortogonais.
+      db.importRow.count({ where: { batchId: id, ...CONFIRMADA_WHERE } }),
     ]);
 
     const header = JSON.parse(batch.headerJson || "[]") as string[];
@@ -311,6 +283,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
         totalLocalizado: batch.totalLocalizado,
         totalValidado: batch.totalValidado,
         totalReview: batch.totalReview,
+        // v0.11.4: contas enriquecidas sem revisão de identidade pendente — população do
+        // escopo "sem revisão" da exportação (nunca derivada por subtração na UI).
+        prontasSemRevisao,
         totalUnresolved: batch.totalUnresolved,
         totalMatriz,
         totalDirectCnpj,

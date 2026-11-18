@@ -29,7 +29,11 @@ export function AcompanhamentoStrip({ detail }: { detail: BatchDetail }) {
   const naFila = fila && fila.estado !== "CONCLUIDA" ? fila.pendentes.length : 0;
   const interrompida = fila?.estado === "PAUSADA";
   const emExecucao = pp.emExecucao + pp.sintetizando;
-  const prontas = detail.totalEnriched - detail.totalReview; // cadastro concluído sem bloqueio
+  // v0.11.4: contador canônico do servidor (mesma população do denominador de dossiês:
+  // identificação cadastral sem bloqueio de identidade). totalEnriched e totalReview são
+  // dimensões ORTOGONAIS (REVIEW conta linhas ainda pendentes de consulta) — subtraí-las
+  // produzia número negativo/zero quando havia linha em revisão não enriquecida.
+  const prontas = pp.identificadasElegiveis;
 
   return (
     <div

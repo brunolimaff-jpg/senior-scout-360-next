@@ -1265,7 +1265,11 @@ function ExportDialog({
   const [tecnicas, setTecnicas] = useState(false);
   const [gerando, setGerando] = useState(false);
 
-  const semRevisao = Math.max(0, detail.totalEnriched - detail.totalReview);
+  // v0.11.4: MESMA população do escopo SEM_REVISAO no servidor (CONFIRMADA_WHERE /
+  // isConfirmed do export): enriquecida, sem identidade LOCALIZADO e resolução
+  // CONFIRMED/nula. Limite conhecido: a exportação conta duplicatas herdadas via eff();
+  // este contador SQL não — divergência pequena, registrada e não reproduzida aqui.
+  const semRevisao = detail.prontasSemRevisao;
   const emRevisao = detail.totalReview;
   const selecionadas = selected.length;
   const hasAi = detail.aiEnabled && detail.aiTotal > 0;
@@ -1477,7 +1481,9 @@ function ResultsReadyPanel({
     alerts.push({ resumo: `${detail.alertHumana} ${detail.alertHumana === 1 ? "identidade" : "identidades"} decidida${detail.alertHumana === 1 ? "" : "s"} manualmente`, texto: `${plural(detail.alertHumana, "identidade")} decidida manualmente por você` });
   // v0.10.14 (reconciliação): "prontas" exclui as que aguardam revisão —
   // antes o título dizia 24 prontas e 6 aguardando ao mesmo tempo
-  const prontas = Math.max(0, detail.totalEnriched - review);
+  // v0.11.4: contador canônico do servidor (mesma população do painel de
+  // acompanhamento) — nunca a subtração de conjuntos ortogonais.
+  const prontas = detail.pesquisaProfunda.identificadasElegiveis;
   // v0.11.0 (Gate 6): painel COMPACTO de uma linha — o resumo do lote não pode
   // comer a primeira dobra da mesa de investigação. O CTA de revisão (antes um
   // banner amarelo separado, ~110px) mora aqui; a explicação longa segue no
